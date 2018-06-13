@@ -1,0 +1,60 @@
+FARGO_THORIN license
+
+By using the code, you agree to the license below.
+
+When using the code, please make sure you always
+cite appropriate papers, as also requested below.
+
+THORIN extension copyright (C) 2017 Ondřej Chrenko
+
+THORIN is built on top of the original 2D FARGO hydrocode
+(http://fargo.in2p3.fr/-Legacy-archive-),
+several routines adopt the algorithms of the FARGO-ADSG version
+(http://fargo.in2p3.fr/-FARGO-ADSG-)
+and the code is interfaced with the REBOUND integrator package
+(http://rebound.readthedocs.io/en/latest/).
+
+Original FARGO code copyright	(C) 2000 Frédéric Masset
+FARGO-ADSG version copyright	(C) 2008 Clément Baruteau,
+				         Frédéric Masset
+REBOUND package copyright 	(C) 2011 Hanno Rein, Shangfei Liu,
+					 David S. Spiegel,
+					 Akihiko Fujii, Dan Tamayo
+
+Free redistribution, modification and use of any part of the program
+is permitted provided that the following conditions are met:
+
+* Any publication of the scientific results obtained with the
+  program (or its part) must cite the following works:
+	Chrenko et al. (2017) titled "Eccentricity excitation
+		and merging of planetary embryos heated by
+		pebble accretion"
+		(reference for the FARGO_THORIN code);
+	Baruteau, C. & Masset, F. 2008, ApJ, 672, 1054
+		(reference for the FARGO-ADSG code);
+	Masset, F. 2000, A&AS, 141, 165
+		(reference for the FARGO code);
+	Rein, H. & Liu, S.-F. 2012, A&A, 537, A128
+		(reference for the REBOUND package);
+	Rein, H. & Spiegel, D. S. 2015, MNRAS, 446, 1424
+		(reference for the IAS15 integrator).
+  The citation policy above applies to publications of any kind,
+  as well as to conference contributions and educational materials.
+* The copyright notices and license conditions must be retained in
+  the source code during its redistribution and/or modification.
+* The program must be used for educational and scientific purposes
+  exclusively; use of the program for any other purposes is
+  allowed only with specific prior written permission of the author.
+* Any other aspects of the code availability, that may be not
+  covered by the above conditions, follow the terms of the
+  GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option)
+  any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.

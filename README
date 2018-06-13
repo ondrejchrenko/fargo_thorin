@@ -1,0 +1,182 @@
+FARGO_THORIN readme
+
+Copyright (C) 2017 Ondřej Chrenko
+email: chrenko@sirrah.troja.mff.cuni.cz
+
+This program is a modification of the 2D FARGO hydrodynamic
+code (Masset 2000). FARGO_THORIN stands for FARGO with
+Two-fluid HydrOdynamics, the Rebound integrator
+Interface and Non-isothermal gas physics.
+
+The code was introduced in Chrenko et al. (2017)
+and its primary purpose is to study protplanetary systems,
+specifically mutual interactions between a gaseous disk,
+a disk of small solid particles (pebbles) and embedded protoplanets.
+
+--------------------------------------------------------------------
+
+BEFORE using the code or any part of it:
+
+1) Please make sure you read the license agreement
+   (See the 'LICENSE' file distributed along with
+   the program. In case you haven't received the license,
+   please notify the author by email).
+
+2) Please make sure that you are using the latest
+   distribution of the archive which can be found at
+   http://sirrah.troja.mff.cuni.cz/~chrenko/ .
+   The latest change of the code itself or of 
+   the documentation is always listed on the
+   given website.
+
+3) If you have a research topic to be explored using
+   FARGO_THORIN but you find the code too difficult
+   to understand or modify, feel free to contact me
+   and maybe we can start a collaboration.
+
+--------------------------------------------------------------------
+
+VERSION & POSSIBLE BUGS
+
+This is the first (1.0) public version of the program and
+corresponds to the one used in Chrenko et al. (2017). The
+code is perfectly functional for simulations and verification
+runs similar to those presented in Chrenko et al. (2017).
+There are however several deprecated setup options which are leftovers
+from the code development and some combinations of input parameters
+were not tested. I did my best to point out the problematic cases
+in the UserGuide (see the 'UserGuide.pdf' file) but it is probable
+that I forgot to mention some of them. Please contact me by email if you
+encounter bugs of any kind so I can remove them in the next versions.
+
+--------------------------------------------------------------------
+
+QUICK START
+
+Compilation & prerequisites:
+	Go to /src_main. There are several primitive shell
+	scripts (*.sh) which operate with the makefiles located
+	in the /src* directories. These scripts cover
+	the basic options you have when compiling the code
+	for various CPU configurations (single, multicore
+	or clusters).
+
+	The most useful builds can be compiled by running:
+	./make.sh	(this creates a sequential single-CPU build
+			suitable for testing purposes, low-resolution
+			runs or short-term runs)
+	or
+	./make_para.sh	(this creates a parallel multi-CPU build
+			with MPI support which is a very efficient
+			form of parallelism. This should be preferred
+			for numerically demanding, high-resolution
+			tasks)
+
+	The default setting of the shell scripts and makefiles
+	is intended for any distribution of the Linux OS and for
+	the gcc compiler. OpenMP and MPI support is not mandatory,
+	it is however required for multithreading or for
+	distributed-memory calculations.
+
+	In case your machine architecture does not support the
+	prerequisites above, you must manually modify the
+	respective makefiles (e.g. change the compiler or/and
+	the compilation switches).
+
+Recompilation:
+	Go to /src_main and issue ./makeclean.sh
+	Then compile the code again according to your preferences.
+
+Executable:
+	If the steps above were successful, you will find the
+	./thorin executable in the parent directory.
+
+Run an example:
+	There are two example calculations prepared in this archive.
+	These are stored in the /in_relax and /in_wplanet directories.
+	The examples demonstrate how to proceed when one wants to
+	include the disk of pebbles into the simulation.
+
+	*************
+
+	Simulation I:
+	The directory /in_relax contains the setup to a preparatory
+	simulation which evolves only the gas disk. By performing
+	the simulation, the disk is relaxed into an equilibrium
+	state in which the heating and cooling processes are balanced.
+
+	The directory contains a parametric setup file named
+	'in.par' and also a planet configuration file named
+	'zeromass.planet.cfg' which includes a planet of negligible
+	mass into the calculation.
+
+	To start the simulation after compiling with ./make.sh, move
+	to the parent directory and execute:
+	./thorin in_relax/in.par
+
+	The calculation will create a directory /out_relax
+	and it will write 40 outputs. It takes about 80 minutes on
+	a laptop.
+
+	To start the simulation on a CPU cluster after compiling
+	with ./make_para.sh, move to the parent directory and execute:
+	mpiexec -np X ./thorin -m in_relax/in.par
+
+		where 	'X' must be replaced by the number of available
+			    cores	
+ 			'm' is a command line switch that will allow
+			    the output files from various CPUs to be merged
+			    on the master CPU
+
+		(Depending on the cluster architecture and settings, you
+		might want to provide the names	of available cluster nodes
+		and numbers of cores on each of them in an MPI hostfile.
+		To do so, change the command as
+		mpiexec -np X -hostfile HOSTFILENAME ......
+		where 'HOSTFILENAME' is the name of the hostfile.)
+	
+	The calculation takes about 25 minutes on a cluster
+	of 4x5 CPU cores.
+
+	*************
+
+	Simulation II:
+	The directory /in_wplanet contains the setup of a full
+	simulation which evolves the gas disk, the pebble disk
+	and a single embedded planet of the mass equal to 10 Earth
+	masses. The planet accretes from the pebble disk and is
+	also heated by pebble accretion. Parametric setup of the
+	simulation is again named 'in.par', the planet configuration
+	file is named 'embryo.10ME.cfg'.
+
+	(!!!) The simulation can only be started if the following
+	conditions are met:
+		i) Simulation I is completed.
+		ii) The final hydrodynamic fields gasdens40.dat,
+		    gasvrad40.dat, gasvtheta40.dat and gastemper40.dat
+		    from the output directory /out_relax are
+		    translated into 1-column ascii files, moved
+		    into the directory /in_wplanet and renamed to
+		    gasdens.cfg, gasvrad.cfg, gasvtheta.cfg and
+		    gastemper.cfg.
+	The purpose of step ii) is to provide an initial steady-state
+	gas disk description for the initialisation routines. The entire
+	step ii) can be done by running an auxiliary python script
+	named 'bin2ascii.py' placed in the /in_wplanet directory.
+	For the script to be succesfull, step i) must be fulfilled
+	and your system must support python.
+
+	To run the simulation, the commands are similar to the previous
+	ones:
+
+	./thorin in_wplanet/in.par
+	or
+	mpiexec -np X ./thorin -m in_wplanet/in.par
+
+	The calculation will create a directory /out_wplanet
+	and it will write 40 outputs. It takes about 80 minutes on
+	a laptop.
+
+	Note that this is only an example! For a given planet mass,
+	the resolution is too small e.g. to properly recover the Type-I
+	torques.

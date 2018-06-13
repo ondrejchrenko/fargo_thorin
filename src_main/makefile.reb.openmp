@@ -1,0 +1,18 @@
+
+export OPENGL=
+export CC=gcc
+export OPENMP=1
+include ../src_reb/Makefile.defs
+
+all: librebound
+
+librebound: 
+	@echo "Compiling shared library librebound.so ..."
+	$(MAKE) -C ../src_reb/
+	@-rm -f librebound.so
+	@ln -s ../src_reb/librebound.so .
+
+clean:
+	@echo "Cleaning up shared library librebound.so ..."
+	@-rm -f librebound.so
+	$(MAKE) -C ../src_reb/ clean
