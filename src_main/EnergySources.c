@@ -19,8 +19,15 @@
 
 #include "fargo.h"
 
-#define SORMAXITERS 1000
-#define SOREPS 1.0e-8
+/* Control parameters of the SOR-algorithm */
+#define SORMAXITERS 1000	/* Max no. of iterations */
+#define SOREPS 1.0e-8		/* Precision when comparing the improvement of residues */
+/* To avoid convergence issues due to double-precision limitations: */
+#define SORMIN 1.0e-15		/* Will be compared with the normalised residue
+				   (SOR will finish when close to the DP limit)
+				   and the temperature improvements
+				   (SOR will finish if the temperature does not improve
+				   within the DP limit) */
 
 /* Opacity table according to Bell & Lin (1994), see also Keith & Wardle (2014) */
 static real kappa0[7] = {2.0e-4, 2.0e16, 0.1, 2.0e81, 1.0e-8, 1.0e-36, 1.5e20};
@@ -253,11 +260,13 @@ real dt;
    * After SOR, the temperature in overlapping zones will be synchronized,
    * leaving old values of T only in the inner ring of inner CPU and in the outer ring
    * of outer CPU. T is updated in these rings by adopting the neighbouring value. */
-#pragma omp parlallel default(none) \
+#pragma omp parallel default(none) \
   shared(nr, ns, One_or_active, MaxMO_or_active, Rmed, Rinf, \
          InvDiffRmed, InvDiffRsup, A, B, Dr, Dt, cs, dt, Ml, Mlip, \
-         Mlim, Mljp, Mljm, RHS, CV, divergence, qminus, temper, qplus, ADIABIND) \
-  private(i, j, l, lip, dxtheta, invdxtheta2, ljp, H, afac, bfac)
+         Mlim, Mljp, Mljm, RHS, CV, divergence, qminus, temper, qplus, ADIABIND, \
+         OmegaInv, SQRT_ADIABIND_INV, rho, StellarIrradiation, qirr, AccretHeating, \
+	 heatsrc_max, heatsrc_index, heatsrc) \
+  private(i, j, l, k, lip, dxtheta, invdxtheta2, ljp, H, afac, bfac)
   {
 #pragma omp for
   for (i=1; i<nr; i++) {		// parts of matrices for SOR (no active mesh restriction so far!)
@@ -397,9 +406,9 @@ int SuccessiveOverrelaxation (omega, errcheck)
 real omega;
 boolean errcheck;
 {
-  int n, i, j, l, nr, ns, ipass, jchess;
+  int n, i, j, l, nr, ns, ipass, jchess, temper_changes, tempint;
   int lip, lim, ljp, ljm;
-  real resid, normres0 = 0.0, normres, temp;
+  real resid, normres0 = 0.0, normres, temp, dtemper;
   real *temper, *Ml, *Mlip, *Mlim, *Mljp, *Mljm, *RHS;
   static boolean first=YES;
   /* ----- */
@@ -440,6 +449,7 @@ boolean errcheck;
   normres0 = temp;
   for (n=1; n<=SORMAXITERS; n++) {
     normres = 0.0;
+    temper_changes = 0;
     for (ipass = 1; ipass <= 2; ipass++) {	// array is swept through as a chessboard (blackorwhite cells first, whiteorblack cells second)
       if (ipass == 1) jchess = jchess1st;
       if (ipass == 2) jchess = jchess2nd;
@@ -447,8 +457,8 @@ boolean errcheck;
 #pragma omp parallel for default(none) \
   shared(One_or_active, MaxMO_or_active, ns, temper, Ml, Mlip, \
 	 Mlim, Mljp, Mljm, RHS, omega) \
-  private(i, j, l, lip, lim, ljp, ljm, resid) \
-  firstprivate(jchess) reduction(+ : normres)
+  private(i, j, l, lip, lim, ljp, ljm, resid, dtemper) \
+  firstprivate(jchess) reduction(+ : normres, temper_changes)
       for (i=One_or_active; i<MaxMO_or_active; i++) {
         for (j=jchess; j<ns; j+=2) {	// increment of 'j' index is 2
           l = j + i*ns;
@@ -462,7 +472,10 @@ boolean errcheck;
             + temper[lim]*Mlim[l] + temper[ljp]*Mljp[l] \
             + temper[ljm]*Mljm[l] - RHS[l];
           normres += fabs(resid);
-          temper[l] -= omega*resid/Ml[l];
+	  dtemper = omega*resid/Ml[l];
+          temper[l] -= dtemper;
+	  if (dtemper < 0.0) dtemper = -dtemper;	// now check if the iterations really improve the temperature within the given precision limit. If yes, sum the number of improvements
+	  if (dtemper > temper[l]*SORMIN) temper_changes++;
         }
         jchess = 1 - jchess; // change the starting value of 'j' for the next increment of 'i'
       }
@@ -470,7 +483,11 @@ boolean errcheck;
     }
     MPI_Allreduce (&normres, &temp, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     normres = temp;
-    if (normres < SOREPS*normres0) return n;
+    if (normres < SOREPS*normres0) return n;	// standard SOR convergence test
+    if (normres < SORMIN) return n;	// finish also when the normalised residue is as small as the given precision
+    MPI_Allreduce (&temper_changes, &tempint, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    temper_changes = tempint;
+    if (temper_changes == 0) return n;	// finish also when temperature in all cells stops being improved
   }
   if (errcheck) {
     masterprint ("Error!\n");
@@ -656,7 +673,6 @@ PolarGrid *Rho;
 void OpacityProfile ()
 {
   int nr, ns, i, j, l;
-  real kappa1, kappa2, kappa3, tmp1, tmp2;
   real *opacity, *temper, *voldens;
   real T, Dens;
   static boolean FillParametricOpacity = YES;
@@ -667,8 +683,8 @@ void OpacityProfile ()
   ns = Temperature->Nsec;
   voldens = VolumeDensity->Field;
   if (PARAMETRICOPACITY > 0.0) {
-    if (FillParametricOpacity) {	/* if the parametric opacity is used ... */
-      FillParametricOpacity = NO;	/* fill the array only once ... */
+    if (FillParametricOpacity) {        /* if the parametric opacity is used ... */
+      FillParametricOpacity = NO;       /* fill the array only once ... */
       for (i=0; i<nr; i++) {
         for (j=0; j<ns; j++) {
           l = j + i*ns;
@@ -676,42 +692,56 @@ void OpacityProfile ()
         }
       }
     } else {
-      return;				/* ... and exit the function in subsequent calls */
+      return;                           /* ... and exit the function in subsequent calls */
     }
   }
-#pragma omp parallel for default(none) shared(nr,ns,temper,voldens,opacity,kappa0,a,b) \
-  private(i,j,l,T,Dens,kappa1,kappa2,kappa3,tmp1,tmp2)
+#pragma omp parallel for default(none) \
+  shared(nr,ns,temper,voldens,opacity) \
+  private(i,j,l,T,Dens)
   for (i=0; i<nr; i++) {
     for (j=0; j<ns; j++) {
       l = j + i*ns;
-      T = temper[l]*T2SI;		/* temperature transformed from code units to Kelvins */
-      Dens = voldens[l]*RHO2CGS;		/* transform to cgs */
-      /* transitions calculated using eq. (12) in Keith & Wardle (2014);
-       * comparisons performed in cgs */
-      if (T <= 2286.8*pow(Dens,0.0408)) {
-        kappa1 = kappa0[0] * pow(Dens,a[0]) * pow(T,b[0]);
-	kappa2 = kappa0[1] * pow(Dens,a[1]) * pow(T,b[1]);
-	kappa3 = kappa0[2] * pow(Dens,a[2]) * pow(T,b[2]);
-        tmp1 = 1.0/(kappa1*kappa1) + 1.0/(kappa2*kappa2);
-	tmp1 = 1.0/(tmp1*tmp1);
-	tmp2 = pow(kappa3/(1.0 + 1.0e22*pow(T,-10.0)), 4.0);
-	opacity[l] = pow(tmp1+tmp2, 0.25);
-      }
-      else if (T > 2286.8*pow(Dens,0.0408) && T <= 2029.8*pow(Dens,0.0123)) {
-        opacity[l] = kappa0[3] * pow(Dens,a[3]) * pow(T,b[3]);
-      }
-      else if (T > 2029.8*pow(Dens,0.0123) && T <= 1.0e5*pow(Dens,0.0476)) {
-        opacity[l] = kappa0[4] * pow(Dens,a[4]) * pow(T,b[4]);
-      }
-      else if (T > 1.0e5*pow(Dens,0.0476) && T <= (31195.2)*pow(Dens,0.0533)) {
-        opacity[l] = kappa0[5] * pow(Dens,a[5]) * pow(T,b[5]);
-      }
-      else {
-        opacity[l] = kappa0[6] * pow(Dens,a[6]) * pow(T,b[6]);
-      }
-      opacity[l] = opacity[l]*OPA2CU;
+      T = temper[l]*T2SI;             /* temperature transformed from code units to Kelvins */
+      Dens = voldens[l]*RHO2CGS;      /* transform to cgs */
+      opacity[l] = OpacityBellLin (Dens, T);
+      opacity[l] *= OPA2CU;
     }
   }
+}
+
+/** Calculates the gas opacity in cgs
+ * following the prescription from Bell & Lin (1994).
+ * The input volume density and temperature of the gas
+ * must be also in cgs. */
+real OpacityBellLin (Dens, T)
+real Dens, T;
+{
+  real kappa1, kappa2, kappa3, tmp1, tmp2;
+  real opacity;
+  /* transitions calculated using eq. (12) in Keith & Wardle (2014);
+   * comparisons performed in cgs */
+  if (T <= 2286.8*pow(Dens,0.0408)) {
+    kappa1 = kappa0[0] * pow(Dens,a[0]) * pow(T,b[0]);
+    kappa2 = kappa0[1] * pow(Dens,a[1]) * pow(T,b[1]);
+    kappa3 = kappa0[2] * pow(Dens,a[2]) * pow(T,b[2]);
+    tmp1 = 1.0/(kappa1*kappa1) + 1.0/(kappa2*kappa2);
+    tmp1 = 1.0/(tmp1*tmp1);
+    tmp2 = pow(kappa3/(1.0 + 1.0e22*pow(T,-10.0)), 4.0);
+    opacity = pow(tmp1+tmp2, 0.25);
+  }
+  else if (T > 2286.8*pow(Dens,0.0408) && T <= 2029.8*pow(Dens,0.0123)) {
+    opacity = kappa0[3] * pow(Dens,a[3]) * pow(T,b[3]);
+  }
+  else if (T > 2029.8*pow(Dens,0.0123) && T <= 1.0e4*pow(Dens,0.0476)) {
+    opacity = kappa0[4] * pow(Dens,a[4]) * pow(T,b[4]);
+  }
+  else if (T > 1.0e4*pow(Dens,0.0476) && T <= (31195.2)*pow(Dens,0.0533)) {
+    opacity = kappa0[5] * pow(Dens,a[5]) * pow(T,b[5]);
+  }
+  else {
+    opacity = kappa0[6] * pow(Dens,a[6]) * pow(T,b[6]);
+  }
+  return opacity;
 }
 
 /** Calculates the flux limiter
@@ -871,11 +901,8 @@ PolarGrid *Surfdens;
       }
       if (PARAMETRICOPACITY > 0.0) Opacity = PARAMETRICOPACITY;
       /* <--- */
-      if (ViscosityAlpha) {
-	Viscalpha = ALPHAVISCOSITY;
-      } else {
-        Viscalpha = VISCOSITY/(H*H*Omega);
-      }
+      Viscalpha = FViscosity (GlobalRmed[i]);	// this will ALWAYS return the kinematic viscosity
+      Viscalpha /= (H*H*Omega);			// this will ALWAYS convert it to alpha
       /* output everything in cgs, only radial coordinate and H should be in AU */
       fprintf (output, "%#.18g\t%#.18g\t%#.18g\t%#.18g\t%#.18g\t%#.18g\t%#.18g\t%#.18g\n",\
         GlobalRmed[i], Rho, tmpr, P[i]*PRESS2CGS, Opacity, Sigma[i]*SIGMA2CGS, Viscalpha, H);
@@ -885,3 +912,73 @@ PolarGrid *Surfdens;
   }
 }
 
+/** Initialization routine which improves the temperature
+ * profile for a fixed surface density profile. Iteratively
+ * equates 'vertical_cooling = simple_viscous_heating'. 
+ * Note that the function modifies the initial energy (not the
+ * temperature itself) which is used as a starting point for 
+ * the initialization. */
+void IterateInitialTemperature ()
+{
+  const real ITEREPS = 1.e-4;
+  const int ITERMAX = 10000;
+  int i, n;
+  real T0, Omega2, H, rho, kappa, tau, taueff, T1, dT;
+  real alpha, viscosity, cs, dalpha, tmri, deltat;
+  /* ----- */
+  masterprint ("\n---------------\n");
+  masterprint ("Balancing the vertical cooling and viscous heating\n");
+  masterprint ("to improve the initial temperature profile...\n");
+  for (i=0; i<NRAD; i++) {
+    T0 = EnergyMed[i]*MOLWEIGHT*(ADIABIND-1.0)/(SigmaMed[i]*GASCONST);	// 0th temperature comes from the initial (bad) internal energy profile
+    Omega2 = pow(Rmed[i],-3.0);
+    n = 0;
+    while (YES) {	// iterate until the precision is reached or maximum number of iterations exceeded
+      H = sqrt(GASCONST/MOLWEIGHT*T0)*OmegaInv[i];	// get H(T0)
+      rho = SigmaMed[i]*SQRT2PI_INV/H;			// get rho(Sigma,H)
+      kappa = OpacityBellLin (rho*RHO2CGS, T0*T2SI);	// get kappa from Bell & Lin (1994)
+      kappa *= OPA2CU;
+      tau = OPACITYDROP*0.5*kappa*SigmaMed[i];
+      taueff = EffectiveOpticalDepth (tau);		// get tau_eff from Hubeny (1990)
+      if (ViscosityAlpha) {				// get viscosity (from alpha if necessary)
+	if (!AlphaFlock) {
+          alpha = ALPHAVISCOSITY;
+        } else {
+          dalpha = ALPHAMRI - ALPHADEAD;
+	  tmri = TMRI/T2SI;
+	  deltat = TWIDTH/T2SI;
+	  alpha = 0.5*dalpha*(1.0 - tanh((tmri - T0)/deltat)) + ALPHADEAD;
+        }
+	cs = sqrt(ADIABIND*(ADIABIND-1.0)*EnergyMed[i]/SigmaMed[i]);
+	viscosity = alpha*cs*cs*OmegaInv[i];
+      } else {
+        viscosity = VISCOSITY;
+      }
+      // find new T1 by solving the energy balance for taueff from above and fixed Sigma
+      T1 = pow(9.0*SigmaMed[i]*viscosity*Omega2*taueff/(8.0*STEFANBOLTZMANN), 0.25);	// e.g. truncated Eq. (10) from Kretke & Lin (2012) 
+      dT = fabs(T1-T0);
+      if (fabs(T1-T0)/T0 < ITEREPS) {
+	EnergyMed[i] = 0.5*(T0+T1)*SigmaMed[i]*GASCONST/(MOLWEIGHT*(ADIABIND-1.0));
+	// printf ("no. of iters: %d\n", n);
+        break;
+      }	else {
+	n++;
+	if (n > ITERMAX) {
+          printf ("Can't iterate the initial temperature profile within %d iterations.\n", ITERMAX);
+	  printf ("Problem for CPU %d, radial distance %f, local radial index %d.\n", \
+            CPU_Rank, Rmed[i], i);
+	  printf ("Last two temperatures [K] of the iterative process: %#.5g\t%#.5g\n", T0*T2SI, T1*T2SI);
+	  printf ("Terminating now...\n");
+	  prs_exit (1);
+	}
+        // to avoid false convergence, new temperature (T0 for the next step) is set randomly between T0,T1 (or T1,T0)
+        dT *= (real)rand() / (real)RAND_MAX;
+	if (T0 > T1) T0 -= dT;
+	if (T0 < T1) T0 += dT;
+      }
+    }
+  }
+  MPI_Barrier (MPI_COMM_WORLD);
+  masterprint ("...done on all CPUs\n");
+  masterprint ("---------------\n");
+}
