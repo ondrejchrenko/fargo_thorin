@@ -158,7 +158,7 @@ char *path;
   input = fopen (path, "r");
   if (input == NULL) {
     fprintf (stderr, "\nError! Can't find the initialization file %s \n", path);
-    exit (1);
+    prs_exit (1);
   }
   field = array->Field;
   nr = array->Nrad;
@@ -169,7 +169,7 @@ char *path;
       if (err == NULL) {
         fprintf (stderr, "\nError! Number of values in the initialization file %s\n", path);
         fprintf (stderr, "is smaller than the size of hydrodynamic arrays.\n");
-	exit(1);
+	prs_exit(1);
       }      
     }
   }
@@ -180,7 +180,7 @@ char *path;
       if (chck == EOF) {
         fprintf (stderr, "\nError! Number of values in the initialization file %s\n", path);
         fprintf (stderr, "is smaller than the size of hydrodynamic arrays.\n");
-	exit(1);
+	prs_exit(1);
       }
     }
   }
@@ -189,7 +189,7 @@ char *path;
     if (chck != EOF) {
       fprintf (stderr, "\nError! Number of values in the initialization file %s\n", path);
       fprintf (stderr, "is larger than the size of hydrodynamic arrays.\n");
-      exit(1);
+      prs_exit(1);
     }
   }
   fclose (input);
