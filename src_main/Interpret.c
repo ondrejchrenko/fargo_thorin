@@ -149,14 +149,19 @@ char *filename;
   if ((*ADVLABEL == 'y') || (*ADVLABEL == 'Y')) AdvecteLabel = YES;
   if ((*OUTERSOURCEMASS == 'y') || (*OUTERSOURCEMASS == 'Y')) OuterSourceMass = YES;
   if ((*TRANSPORT == 's') || (*TRANSPORT == 'S')) FastTransport = NO;
-  if ((*OPENINNERBOUNDARY == 'O') || (*OPENINNERBOUNDARY == 'o')) OpenInner = YES;
-  if ((*OPENINNERBOUNDARY == 'N') || (*OPENINNERBOUNDARY == 'n')) NonReflecting = YES;
   /* #THORIN ---> */
-  if ((*OPENINNERBOUNDARY == 'D') || (*OPENINNERBOUNDARY == 'd')) {
-    Damping = YES;
-  }
+  if ((*NONREFLECTING == 'y') || (*NONREFLECTING == 'Y')) NonReflecting = YES;
+  if ((*OPENINNER == 'y') || (*OPENINNER == 'Y')) OpenInner = YES;
+  if ((*DAMPING == 'y') || (*DAMPING == 'Y')) Damping = YES;
   if ((*DAMPTOWARDS == 'Z') || (*DAMPTOWARDS == 'z')) DampVrad = YES;
   if ((*DAMPTOWARDS == 'I') || (*DAMPTOWARDS == 'i')) DampInit = YES;
+  if (((*NONREFLECTING == 'n') || (*NONREFLECTING == 'N')) && \
+      ((*OPENINNER == 'n') || (*OPENINNER == 'N')) && \
+      ((*DAMPING == 'n') || (*DAMPING == 'N')) ) {
+    masterprint ("Warning!!! The input parameters do not specify the boundary conditions.\n");
+    masterprint ("The WALL (RIGID) boundary condition will be implicitly used.\n");
+    masterprint ("If needed, please set DAMPING, OPENINNER or NONREFLECTING parameters.\n");
+  }
   /* <--- */
   if ((*GRIDSPACING == 'L') || (*GRIDSPACING == 'l')) LogGrid = YES;
   if ((*DISK == 'N') || (*DISK == 'n')) IsDisk = NO;
@@ -169,17 +174,29 @@ char *filename;
   if ((*WRITEDENSITY == 'N') || (*WRITEDENSITY == 'n')) Write_Density = NO;
   if ((*INDIRECTTERM == 'N') || (*INDIRECTTERM == 'n')) Indirect_Term = NO;
   if ((*EXCLUDEHILL == 'Y') || (*EXCLUDEHILL == 'y')) ExcludeHill = YES;
-  if ((ALPHAVISCOSITY != 0.0) && (VISCOSITY != 0.0)) {
+  /* #THORIN ---> */
+  if (ALPHAVISCOSITY != 0.0 && ((*ALPHAFLOCK == 'y') || (*ALPHAFLOCK == 'Y'))) {
     mastererr ("You cannot use at the same time\n");
-    mastererr ("VISCOSITY and ALPHAVISCOSITY.\n");
+    mastererr ("ALPHAVISCOSITY and ALPHAFLOCK.\n");
     mastererr ("Edit the parameter file so as to remove\n");
     mastererr ("one of these variables and run again.\n");
     prs_exit (1);
   }
-  if (ALPHAVISCOSITY != 0.0) {
+  if (ALPHAVISCOSITY != 0.0 || ((*ALPHAFLOCK == 'y') || (*ALPHAFLOCK == 'Y'))) {
     ViscosityAlpha = YES;
+    if ((*ALPHAFLOCK == 'y') || (*ALPHAFLOCK == 'Y')) {
+      AlphaFlock = YES;
+    }
     masterprint ("Viscosity is of alpha type\n");
   }
+  if ((ViscosityAlpha == YES) && (VISCOSITY != 0.0)) {
+    mastererr ("You cannot use at the same time\n");
+    mastererr ("VISCOSITY and ALPHAVISCOSITY/ALPHAFLOCK.\n");
+    mastererr ("Edit the parameter file so as to remove\n");
+    mastererr ("one of these variables and run again.\n");
+    prs_exit (1);
+  }
+  /* <--- */
   if ((THICKNESSSMOOTHING != 0.0) && (ROCHESMOOTHING != 0.0)) {
     mastererr ("You cannot use at the same time\n");
     mastererr ("`ThicknessSmoothing' and `RocheSmoothing'.\n");
@@ -233,6 +250,13 @@ char *filename;
   if ((*WRITEETA == 'y') || (*WRITEETA == 'Y')) Write_Eta = YES;
   if (PARAMETRICACCRETION > 0.0) PrescribedAccretion = YES;
   if (GETTORQUEFORPLANET >= 0) TorqueDensity = YES;
+  if (MASSTAPER <= 0.0) {
+    mastererr ("MASSTAPER is %#.12g\n", MASSTAPER);
+    mastererr ("but should be positive, non-zero number!\n");
+    mastererr ("Please, change the parameter and run again.\n");
+    prs_exit (1);
+  }
+  if ((*ITERINITTEMPER == 'y') || (*ITERINITTEMPER == 'Y')) IterInitTemper = YES;
 }
 
 void PrintUsage (execname)
