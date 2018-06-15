@@ -1,13 +1,9 @@
-
-
 # #THORIN: this makefile is new here; it is a modification
 # of the makefile which is used in one of the example
 # directories in the REBOUND package distribution.
 # Purpose: compile the REBOUND code and put it into
 # a shared library.
 
-export OPENGL=
-export CC=gcc
 include ../src_reb/Makefile.defs
 
 all: librebound

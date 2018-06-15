@@ -6,22 +6,19 @@
 #
 
 # Standard Linux sequential or MPI build
-CC_THORIN = gcc
-OPT_THORIN = -O3 -march=native -Wall -Wno-unknown-pragmas -Wno-unused-result\
+ifeq ($(CC), gcc)
+	CC_THORIN = gcc
+	OPT_THORIN = -O3 -march=native -Wall -Wno-unknown-pragmas -Wno-unused-result\
               -I../src_reb/ -std=c99 -Wl,-rpath,src_main/ -Wpointer-arith
-OPTSEQ_THORIN =
+	PARACC_THORIN = mpicc
+endif
+ifeq ($(CC), icc)
+	CC_THORIN = icc
+	OPT_THORIN = -O3 -I../src_reb/ -std=c99 -Wl,-rpath,src_main/ -axCORE-AVX2 -xSSE4.2 -ip -Wno-unknown-pragmas
+	PARACC_THORIN = icc
+endif
 PARAOPT_THORIN =
-PARACC_THORIN = mpicc
-
-# Standard Linux build with OpenMP support (multithreading)
-CC_THORIN_OPENMP = gcc
-OPT_THORIN_OPENMP = -O3 -march=native -Wall -Wno-unknown-pragmas -Wno-unused-result\
-              -I../src_reb/ -std=c99 -Wl,-rpath,src_main/ -Wpointer-arith\
-              -fopenmp -DOPENMP
-OPTSEQ_THORIN_OPENMP =
-PARAOPT_THORIN_OPENMP =
-PARACC_THORIN_OPENMP = mpicc
-BUILDNOTE_THORIN_OPENMP = multithread
+OPTSEQ_THORIN =
 
 # Generic options valid for any platfom
 # which has 'cc' in the path
@@ -55,11 +52,19 @@ DUMMY		= mpi_dummy.o
 
 COMP        = $(CC_$(FARGO_ARCH))
 OPT         = $(OPT_$(FARGO_ARCH))
+# #THORIN: OpenMP is enabled by setting the environment variable
+# OPENMP=1. This adds the respective compilation switch as follows.
+ifeq ($(OPENMP), 1)
+ifeq ($(COMP), icc)
+	OPT += -qopenmp
+endif
+ifeq ($(COMP), gcc)
+	OPT += -fopenmp
+endif
+endif
 OPTSEQ      = $(OPTSEQ_$(FARGO_ARCH))
 PARAOPT     = $(PARAOPT_$(FARGO_ARCH)) -D_PARALLEL
 PARACOMP    = $(PARACC_$(FARGO_ARCH))
-# #THORIN: dumps info in case of a multi-threaded build
-BUILDNOTE   = $(BUILDNOTE_$(FARGO_ARCH))
 # #THORIN: shared library librebound.so added through -L. -lrebound
 LIBS        = -L. -lrebound -lm
 PARALIBS    = -lmpi
@@ -107,8 +112,8 @@ else
 endif
 	@echo ""
 # #THORIN: dump note in case of a multi-threaded build
-ifeq ($(BUILDNOTE),multithread)
-	@echo "This build is MULTI-THREADED"
+ifeq ($(OPENMP),1)
+	@echo "This build also supports MULTI-THREADING (OpenMP)"
 endif
 
 $(EXENAME): $(OBJ)
