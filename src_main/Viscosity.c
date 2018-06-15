@@ -23,17 +23,32 @@ original code by Frédéric Masset
 static PolarGrid *DRR, *DRP, *DPP;
 /* #THORIN: DivergenceVelocity, TAURR, TAUPP, TAURP are now declared in global.h */
 
-real FViscosity (rad)
+real FViscosity (rad)		/* #THORIN */
      real rad;
 {
-  real viscosity, rmin, rmax, scale;
+  real viscosity, rmin, rmax, scale, alpha;
   int i=0;
+  static boolean first=YES;
+  static real dalpha, tmri, deltat;
   /* ----- */
+  if (first) {
+    first = NO;
+    if (AlphaFlock) {
+      dalpha = ALPHAMRI - ALPHADEAD;
+      tmri = TMRI/T2SI;
+      deltat = TWIDTH/T2SI;
+    }
+  }
   viscosity = VISCOSITY;
-  if (ViscosityAlpha) {
+  if (ViscosityAlpha) {		/* #THORIN: alpha viscosity according to Flock et al. (2016) added */
     while (GlobalRmed[i] < rad) i++;	/* ! this spans the GLOBAL grid (among all MPI processes) */
-		/* #THORIN: globcsvec[] used here */
-    viscosity = ALPHAVISCOSITY*globcsvec[i]*globcsvec[i]*pow(rad, 1.5);
+  		/* #THORIN: globcsvec[] used here */
+    if (!AlphaFlock) {
+      alpha = ALPHAVISCOSITY;
+    } else {
+      alpha = 0.5*dalpha*(1.0 - tanh((tmri - globtvec[i])/deltat)) + ALPHADEAD;
+    }
+    viscosity = alpha*globcsvec[i]*globcsvec[i]*pow(rad, 1.5);
   }
   rmin = CAVITYRADIUS-CAVITYWIDTH*ASPECTRATIO;
   rmax = CAVITYRADIUS+CAVITYWIDTH*ASPECTRATIO;
