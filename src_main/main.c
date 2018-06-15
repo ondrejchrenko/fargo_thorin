@@ -39,11 +39,6 @@ char *argv[];
   MPI_Comm_rank (MPI_COMM_WORLD, &CPU_Rank);
   MPI_Comm_size (MPI_COMM_WORLD, &CPU_Number);
   CPU_Master = (CPU_Rank == 0 ? 1 : 0);
-#ifdef OPENMP   			/* #THORIN: control of the OpenMP threading */
-  omp_set_dynamic (0);  		/* disable automatic adjustment of the number of threads */
-  int numproc = omp_get_num_procs ();	/* find available number of cores */
-  omp_set_num_threads (numproc);	/* set it */
-#endif /* OPENMP */			/* <--- */
   setfpe ();			/* Control behavior for floating point
 				   exceptions trapping (default is not to do anything) */
   if (argc == 1) PrintUsage (argv[0]);
@@ -115,14 +110,6 @@ char *argv[];
     prs_exit (0);
   }
   if (ParameterFile[0] == 0) PrintUsage (argv[0]);
-#ifdef OPENMP   	/* #THORIN: print info in the case of a multithreaded run */
-  if (CPU_Number == 1) {	/* 2DO this wont work with MPI, would have to send info about num of threads from each node to the master */
-    masterprint ("\n\n----------\n");
-    masterprint ("\033[1mMultithreading enabled!\033[0m\n");
-    masterprint ("Number of threads available to parallel constructs: %d\n", omp_get_max_threads());
-    masterprint ("----------\n\n");
-  }
-#endif /* OPENMP <--- */
   ReadVariables (ParameterFile);	/* #THORIN: InitPlanetarySystem() and ListPlanets() used to be here, replaced by functions of the Rebound interface */
   SplitDomain ();
   if (verbose == YES) 
@@ -156,6 +143,7 @@ char *argv[];
   OmegaFrame = OMEGAFRAME;
   if (Corotating == YES) OmegaFrame = GetPsysInfo (sys, FREQUENCY);
   Initialization (gas_density, gas_v_rad, gas_v_theta, gas_energy, gas_label); /* #THORIN */
+  if (AccretHeating) InitAccretHeatSrc (sys->nb);	/* #THORIN */
   InitComputeAccel ();
   if (Restart) OmegaFrame = GetOmegaFrame (NbRestart);	/* #THORIN */
   PhysicalTimeInitial = PhysicalTime;
