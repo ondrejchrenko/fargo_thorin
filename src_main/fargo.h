@@ -45,6 +45,3 @@ original code by Frédéric Masset
 #include <signal.h>
 #include <fenv.h>
 #endif
-#ifdef OPENMP
-#include <omp.h>
-#endif
