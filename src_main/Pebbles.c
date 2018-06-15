@@ -21,8 +21,6 @@
 #define TRAPEZMAX 35
 #define TRAPEZEPS 1.0e-7
 
-#define MASSTAPEPS 1.e-30
-
 extern boolean Restart, FastTransport;
 extern real MassTaper;
 
@@ -372,7 +370,7 @@ real dt;
     Mplanet = sys->mass[k];
     PXplanet = VXplanet*Mplanet;
     PYplanet = VYplanet*Mplanet;
-    Mplanet *= (MassTaper+MASSTAPEPS);					// MassTaper must be applied after the momenta are calculated !
+    Mplanet *= MassTaper;						// MassTaper must be applied after the momenta are calculated !
     Rplanet = Xplanet*Xplanet + Yplanet*Yplanet;
     Rplanet3D = sqrt(Rplanet + Zplanet*Zplanet);
     Rplanet = sqrt(Rplanet);
@@ -528,7 +526,7 @@ real dt;
     // STEP 7 - Update the planet
     PXplanet += dPXplanet;
     PYplanet += dPYplanet;
-    Mplanet /= (MassTaper + MASSTAPEPS);	// get the original mass back (so that we don't destroy values in 'sys')
+    Mplanet /= MassTaper;	// get the original mass back (so that we don't destroy values in 'sys')
     Mplanet  += dMplanet;
     sys->mass[k] = Mplanet;
     sys->vx[k] = PXplanet/Mplanet;
@@ -815,7 +813,7 @@ real dt;
   if (AccretHeating) heatsrc_max = sys->nb;
   for (k=0; k<sys->nb; k++) {
     Mplanet = sys->mass[k];
-    Mplanet *= (MassTaper + MASSTAPEPS);
+    Mplanet *= MassTaper;
     Xplanet = sys->x[k];
     Yplanet = sys->y[k];
     dMplanet = Mplanet*dt/doubling;
@@ -841,7 +839,7 @@ real dt;
         heatsrc[k] = dE;
       }
     }
-    Mplanet /= (MassTaper + MASSTAPEPS);
+    Mplanet /= MassTaper;
     Mplanet += dMplanet;
     sys->mass[k] = Mplanet;
   }
