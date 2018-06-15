@@ -12,10 +12,10 @@ original code by Frédéric Masset
 
 #include "fargo.h"
 
-void merge (nb)	/* #THORIN: new outputs */
+void merge (nb)	/* #THORIN: new outputs; check of the system() command return value */
      int nb;
 {
-  int i,j;
+  int i,j,err=0;
   char radix[512];
   char command[1024];
   boolean gotonext;
@@ -35,11 +35,21 @@ void merge (nb)	/* #THORIN: new outputs */
     for (i = 1; i < CPU_Number; i++) {
       sprintf (command, "cd %s; cat gas%s%d.dat.%05d >> gas%s%d.dat",\
 	       OUTPUTDIR, radix, nb, i, radix, nb);
-      system (command);
+      err = system (command);
+      if (err == -1) {
+	printf ("Error! Unable to cat output file gas%s%d.dat.%05d\n", radix, nb, i);
+	printf ("Terminating now...\n");
+        prs_exit (1);
+      }
     }
     sprintf (command, "cd %s; rm -f gas%s%d.dat.0*",\
 	     OUTPUTDIR, radix, nb);
-    system (command);
+    err = system (command);
+    if (err == -1) {
+      printf ("Error! Unable to rm output files gas%s%d.dat.0*", radix, nb);
+      printf ("Terminating now...\n");
+      prs_exit (1);
+    }
   }
   gotonext = NO;
   for (j = 0; j < 9; j++) {
@@ -115,11 +125,21 @@ void merge (nb)	/* #THORIN: new outputs */
     for (i = 1; i < CPU_Number; i++) {
       sprintf (command, "cd %s; cat gas%s%d.dat.%05d >> gas%s%d.dat",\
 	       OUTPUTDIR, radix, nb, i, radix, nb);
-      system (command);
+      err = system (command);
+      if (err == -1) {
+	printf ("Error! Unable to cat output file gas%s%d.dat.%05d\n", radix, nb, i);
+	printf ("Terminating now...\n");
+        prs_exit (1);
+      }
     }
     sprintf (command, "cd %s; rm -f gas%s%d.dat.0*",\
 	     OUTPUTDIR, radix, nb);
-    system (command);
+    err = system (command);
+    if (err == -1) {
+      printf ("Error! Unable to rm output files gas%s%d.dat.0*", radix, nb);
+      printf ("Terminating now...\n");
+      prs_exit (1);
+    }
   }
   message ("done\n");
   fflush (stdout);
