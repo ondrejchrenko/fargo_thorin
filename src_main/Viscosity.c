@@ -23,14 +23,40 @@ original code by Frédéric Masset
 static PolarGrid *DRR, *DRP, *DPP;
 /* #THORIN: DivergenceVelocity, TAURR, TAUPP, TAURP are now declared in global.h */
 
-real FViscosity (rad)		/* #THORIN */
+real FViscosity (rad)		/* #THORIN: new type of alpha viscosity; cavities disabled */
      real rad;
 {
-  real viscosity, rmin, rmax, scale, alpha;
+  real viscosity, omegainv;
+  //real rmin, rmax, scale, alpha;
   int i=0;
+  /* ----- */
+  if (!ViscosityAlpha) {
+    viscosity = VISCOSITY;
+  } else {				/* #THORIN: alpha viscosity according to Flock et al. (2016) added */
+    omegainv = pow(rad,1.5);
+    while (GlobalRmed[i] < rad) i++;	/* ! this spans the GLOBAL grid (among all MPI processes) */
+    viscosity = NuFromAlpha (omegainv, globtvec[i], globcsvec[i]);
+  }
+  /* #THORIN: cavity creation temporarily disabled in this version */
+  /*rmin = CAVITYRADIUS-CAVITYWIDTH*ASPECTRATIO;
+  rmax = CAVITYRADIUS+CAVITYWIDTH*ASPECTRATIO;
+  scale = 1.0+(PhysicalTime-PhysicalTimeInitial)*LAMBDADOUBLING;
+  rmin *= scale;
+  rmax *= scale;
+  if (rad < rmin) viscosity *= CAVITYRATIO;
+  if ((rad >= rmin) && (rad <= rmax)) {
+    viscosity *= exp((rmax-rad)/(rmax-rmin)*log(CAVITYRATIO));
+  }*/
+  return viscosity;
+}
+ 
+/** Function which calculates the kinematic from alpha viscosity. */
+real NuFromAlpha (omegainv, temper, cs)
+real omegainv, temper, cs;
+{
+  real viscosity, alpha;
   static boolean first=YES;
   static real dalpha, tmri, deltat;
-  /* ----- */
   if (first) {
     first = NO;
     if (AlphaFlock) {
@@ -39,29 +65,15 @@ real FViscosity (rad)		/* #THORIN */
       deltat = TWIDTH/T2SI;
     }
   }
-  viscosity = VISCOSITY;
-  if (ViscosityAlpha) {		/* #THORIN: alpha viscosity according to Flock et al. (2016) added */
-    while (GlobalRmed[i] < rad) i++;	/* ! this spans the GLOBAL grid (among all MPI processes) */
-  		/* #THORIN: globcsvec[] used here */
-    if (!AlphaFlock) {
-      alpha = ALPHAVISCOSITY;
-    } else {
-      alpha = 0.5*dalpha*(1.0 - tanh((tmri - globtvec[i])/deltat)) + ALPHADEAD;
-    }
-    viscosity = alpha*globcsvec[i]*globcsvec[i]*pow(rad, 1.5);
+  if (!AlphaFlock) {
+    alpha = ALPHAVISCOSITY;
+  } else {
+    alpha = 0.5*dalpha*(1.0 - tanh((tmri - temper)/deltat)) + ALPHADEAD;
   }
-  rmin = CAVITYRADIUS-CAVITYWIDTH*ASPECTRATIO;
-  rmax = CAVITYRADIUS+CAVITYWIDTH*ASPECTRATIO;
-  scale = 1.0+(PhysicalTime-PhysicalTimeInitial)*LAMBDADOUBLING;
-  rmin *= scale;
-  rmax *= scale;
-  if (rad < rmin) viscosity *= CAVITYRATIO;
-  if ((rad >= rmin) && (rad <= rmax)) {
-    viscosity *= exp((rmax-rad)/(rmax-rmin)*log(CAVITYRATIO));
-  }
+  viscosity = alpha*cs*cs*omegainv;
   return viscosity;
 }
-  
+
 real AspectRatio (rad)
      real rad;
 {

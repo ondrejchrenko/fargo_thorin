@@ -127,8 +127,8 @@ PolarGrid *Rho, *Vr, *Vt, *En;
   FillPolar1DArrays (); /* #THORIN: construct the arrays related to the grid (Rinf, Rsup, ...) here */
   FillSigma ();		/* calculate SigmaMed[] and SigmaInf[] based on the surf.density profile */
   FillEnergy ();	/* #THORIN: calculate EnergyMed; see Theo.c */
-  if (EnergyEq && IterInitTemper) {
-    if (!InitFromFile && !Restart) IterateInitialTemperature ();		/* #THORIN: improve the initial temperature profile by simple iterations */
+  if (EnergyEq && (IterInitTemper || DiskAccretion)) {
+    if (!InitFromFile && !Restart) IterateInitialProfiles ();		/* #THORIN: improve the initial temperature profile by simple iterations */
   }
   InitGasDensityEnergy (Rho, En);	/* #THORIN: we initialize the density and energy
 					   here because they are needed to compute

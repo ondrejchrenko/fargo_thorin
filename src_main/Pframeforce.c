@@ -666,8 +666,9 @@ PolarGrid *Vr, *Vt;
 	vr[l] = 0.0;
       else {
 	vr[l] = IMPOSEDDISKDRIFT*SIGMA0/SigmaInf[i]/ri;
-	if (ViscosityAlpha) {
-	  vr[l] -= 3.0*viscosity/r*(-SIGMASLOPE+2.0*FLARINGINDEX+1.0);
+        if (ViscosityAlpha || DiskAccretion) {
+          // vr[l] -= 3.0*viscosity/r*(-SIGMASLOPE+2.0*FLARINGINDEX+1.0);
+          vr[l] -= 1.5*viscosity*InvRinf[i];            // #THORIN - v_r in classical alpha disks
 	} else {
 	  vr[l] -= 3.0*viscosity/r*(-SIGMASLOPE+.5);
 	}
@@ -675,6 +676,6 @@ PolarGrid *Vr, *Vt;
     }
   }
   for (j = 0; j < ns; j++)
-    vr[j] = vr[j+ns*nr] = 0.0;
+    if (!DiskAccretion) vr[j] = vr[j+ns*nr] = 0.0;
 }
 /* <---- */

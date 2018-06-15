@@ -155,6 +155,7 @@ char *filename;
   if ((*DAMPING == 'y') || (*DAMPING == 'Y')) Damping = YES;
   if ((*DAMPTOWARDS == 'Z') || (*DAMPTOWARDS == 'z')) DampVrad = YES;
   if ((*DAMPTOWARDS == 'I') || (*DAMPTOWARDS == 'i')) DampInit = YES;
+  if ((*DAMPTOWARDS == 'A') || (*DAMPTOWARDS == 'A')) DampAlphaVeloc = YES;
   if (((*NONREFLECTING == 'n') || (*NONREFLECTING == 'N')) && \
       ((*OPENINNER == 'n') || (*OPENINNER == 'N')) && \
       ((*DAMPING == 'n') || (*DAMPING == 'N')) ) {
@@ -257,6 +258,7 @@ char *filename;
     prs_exit (1);
   }
   if ((*ITERINITTEMPER == 'y') || (*ITERINITTEMPER == 'Y')) IterInitTemper = YES;
+  if (DISKACCRETION > 0.0) DiskAccretion = YES;
 }
 
 void PrintUsage (execname)

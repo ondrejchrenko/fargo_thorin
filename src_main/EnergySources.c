@@ -918,47 +918,62 @@ PolarGrid *Surfdens;
  * Note that the function modifies the initial energy (not the
  * temperature itself) which is used as a starting point for 
  * the initialization. */
-void IterateInitialTemperature ()
+void IterateInitialProfiles ()
 {
-  const real ITEREPS = 1.e-4;
-  const int ITERMAX = 10000;
+  const real ITEREPS = 1.e-3;
+  const int ITERMAX = 1000000;
+  const real CHIANG_GOLDREICH_FLARING = 2.0/7.0;
   int i, n;
   real T0, Omega2, H, rho, kappa, tau, taueff, T1, dT;
-  real alpha, viscosity, cs, dalpha, tmri, deltat;
+  real Sigma, Mdot, viscosity, cs, Teff4, Rstar=0.0, Rstar2;
+  real Tirr4fac=0.0, Tirr4, flaring;
   /* ----- */
   masterprint ("\n---------------\n");
-  masterprint ("Balancing the vertical cooling and viscous heating\n");
-  masterprint ("to improve the initial temperature profile...\n");
+  masterprint ("Balancing the vertical cooling, viscous heating\n");
+  if (StellarIrradiation) masterprint ("and stellar irradiation\n");
+  masterprint ("to improve the initial radial profiles...\n");
+  if (StellarIrradiation) {
+    Teff4 = EFFECTIVETEMPERATURE/T2SI;
+    Teff4 = pow(Teff4, 4.0);
+    Rstar = STELLARRADIUS*6.957e8/AU_SI;     // 1 solar radius in code units
+    Rstar2 = pow(Rstar,2.0);
+    Tirr4fac = (1.0 - DISCALBEDO)*Teff4*Rstar2;
+  }
   for (i=0; i<NRAD; i++) {
-    T0 = EnergyMed[i]*MOLWEIGHT*(ADIABIND-1.0)/(SigmaMed[i]*GASCONST);	// 0th temperature comes from the initial (bad) internal energy profile
+    T0 = EnergyMed[i]*MOLWEIGHT*(ADIABIND-1.0)/(SigmaMed[i]*GASCONST);	// 0th temperature comes from the initial (bad) internal energy and surface density profile
     Omega2 = pow(Rmed[i],-3.0);
     n = 0;
     while (YES) {	// iterate until the precision is reached or maximum number of iterations exceeded
-      H = sqrt(GASCONST/MOLWEIGHT*T0)*OmegaInv[i];	// get H(T0)
-      rho = SigmaMed[i]*SQRT2PI_INV/H;			// get rho(Sigma,H)
+      cs = sqrt(ADIABIND*GASCONST/MOLWEIGHT*T0);
+      H = cs*OmegaInv[i]*SQRT_ADIABIND_INV;		// get H(T0)
+      if (!ViscosityAlpha) {
+        viscosity = VISCOSITY;
+      } else {
+        viscosity = NuFromAlpha (OmegaInv[i], T0, cs); 
+      }
+      if (!DiskAccretion) {
+        Sigma = SigmaMed[i];
+      } else {
+        Mdot = DISKACCRETION/(2.0*PI);
+        Sigma = Mdot/(3.0*PI*viscosity);
+      }
+      rho = Sigma*SQRT2PI_INV/H;			// get rho(Sigma,H)
       kappa = OpacityBellLin (rho*RHO2CGS, T0*T2SI);	// get kappa from Bell & Lin (1994)
       kappa *= OPA2CU;
-      tau = OPACITYDROP*0.5*kappa*SigmaMed[i];
+      tau = OPACITYDROP*0.5*kappa*Sigma;
       taueff = EffectiveOpticalDepth (tau);		// get tau_eff from Hubeny (1990)
-      if (ViscosityAlpha) {				// get viscosity (from alpha if necessary)
-	if (!AlphaFlock) {
-          alpha = ALPHAVISCOSITY;
-        } else {
-          dalpha = ALPHAMRI - ALPHADEAD;
-	  tmri = TMRI/T2SI;
-	  deltat = TWIDTH/T2SI;
-	  alpha = 0.5*dalpha*(1.0 - tanh((tmri - T0)/deltat)) + ALPHADEAD;
-        }
-	cs = sqrt(ADIABIND*(ADIABIND-1.0)*EnergyMed[i]/SigmaMed[i]);
-	viscosity = alpha*cs*cs*OmegaInv[i];
+      if (StellarIrradiation) {
+        flaring = (0.4*Rstar + CHIANG_GOLDREICH_FLARING*H)*InvRmed[i];
+        Tirr4 = Tirr4fac/Rmed2[i]*flaring;
       } else {
-        viscosity = VISCOSITY;
+        Tirr4 = 0.0;
       }
-      // find new T1 by solving the energy balance for taueff from above and fixed Sigma
-      T1 = pow(9.0*SigmaMed[i]*viscosity*Omega2*taueff/(8.0*STEFANBOLTZMANN), 0.25);	// e.g. truncated Eq. (10) from Kretke & Lin (2012) 
+      // find new T1 by solving the energy balance (e.g. eq. 3.54 in Armitage 2010, but Hubeny's model + irradiation accounted for)
+      T1 = pow(9.0*Sigma*viscosity*Omega2*taueff/(8.0*STEFANBOLTZMANN) + Tirr4, 0.25);
       dT = fabs(T1-T0);
       if (fabs(T1-T0)/T0 < ITEREPS) {
-	EnergyMed[i] = 0.5*(T0+T1)*SigmaMed[i]*GASCONST/(MOLWEIGHT*(ADIABIND-1.0));
+	EnergyMed[i] = 0.5*(T0+T1)*Sigma*GASCONST/(MOLWEIGHT*(ADIABIND-1.0));
+	if (DiskAccretion) SigmaMed[i] = Sigma;
 	// printf ("no. of iters: %d\n", n);
         break;
       }	else {

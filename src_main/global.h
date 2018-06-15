@@ -21,11 +21,11 @@ real OmegaFrame, PhysicalTime=0.0, PhysicalTimeInitial;
 real *heatsrc;								/* #THORIN */
 int heatsrc_max;							/* #THORIN */
 int TimeStep=0;
-boolean EnergyEq, StoreEnergy, ParametricCooling, Damping, DampVrad, DampInit, StellarIrradiation;	/* #THORIN */
+boolean EnergyEq, StoreEnergy, ParametricCooling, Damping, DampVrad, DampInit, DampAlphaVeloc, StellarIrradiation;	/* #THORIN */
 boolean InitFromFile, Write_Temperature, Write_Energy, Write_Divergence, Write_Qplus, Write_Qbalance;			/*#THORIN*/
 boolean Collisions, WriteTorque, WriteTorqueMapFile, MonitorNPL, FeelDisk;  				/* #THORIN */
 boolean Pebbles, Write_Eta, AccretHeating, BackReaction, ActualizeLuminosity, DiffusiveParticles, PrescribedAccretion; 	/* #THORIN */
-boolean *heatsrc_index, TorqueDensity, AlphaFlock, IterInitTemper;	/* #THORIN */
+boolean *heatsrc_index, TorqueDensity, AlphaFlock, IterInitTemper, DiskAccretion;	/* #THORIN */
 boolean Merge, AdvecteLabel, FakeSequential, MonitorIntegral, debug, OnlyInit;
 boolean	GotoNextOutput, StoreSigma, ViscosityAlpha, RocheSmoothing;
 boolean CentrifugalBalance, ExcludeHill, SloppyCFL;

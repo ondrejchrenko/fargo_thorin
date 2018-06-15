@@ -76,6 +76,7 @@ extern	char	DAMPTOWARDS[512];
 extern	real	DAMPINGRMINFRAC;
 extern	real	DAMPINGRMAXFRAC;
 extern	real	DAMPINGPERIODFRAC;
+extern	real	DISKACCRETION;
 extern	int	NOUTELEMENTS;
 extern	real	PLANETARYDENSITY;
 extern	char	RESOLVECOLLISIONS[512];
