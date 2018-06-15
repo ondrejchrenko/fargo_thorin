@@ -25,6 +25,7 @@ static PolarGrid *VradNew,   *VradInt;
 static PolarGrid *VthetaNew, *VthetaInt;
 static real timeCRASH;  
 extern boolean Corotating;
+extern boolean Restart;		/* #THORIN */
 
 static PolarGrid *EnergyNew, *EnergyInt;	/* #THORIN */
 

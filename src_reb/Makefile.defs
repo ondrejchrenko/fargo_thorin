@@ -1,4 +1,9 @@
-OPT+= -std=c99 -Wpointer-arith -Wno-unused-result -D_GNU_SOURCE -O3 -march=native
+ifeq ($(CC), icc)
+	OPT+= -O3 -std=c99 -restrict -axCORE-AVX2 -xSSE4.2 -ip
+endif
+ifeq ($(CC), gcc)
+	OPT+= -std=c99 -Wpointer-arith -Wno-unused-result -D_GNU_SOURCE -O3 -march=native
+endif
 ifndef OS
 	OS=$(shell uname)
 endif
@@ -44,8 +49,8 @@ endif
 ifeq ($(OPENMP), 1)
 	PREDEF+= -DOPENMP
 ifeq ($(CC), icc)
-	OPT+= -openmp
-	LIB+= -openmp
+	OPT+= -qopenmp
+	LIB+= -qopenmp
 else
 	OPT+= -fopenmp
 	LIB+= -fopenmp
