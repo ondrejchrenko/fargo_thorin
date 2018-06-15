@@ -44,16 +44,16 @@ PlanetarySystem *sys;
   real xpl, ypl, zpl, mpl, dpl, invdpl3, smoothing;
   int m, Nvert;
   real d2, d, H, H2, zmax, deltaz;
-  real rsm[MAXPLANETS], rsm2[MAXPLANETS], sigma, znode, znode2, denom, ax, ay, ar, at, axindir, ayindir;
-  real rst, rst2[MAXPLANETS], rst3[MAXPLANETS], rst4[MAXPLANETS], taper, omegainv, r2, r2chk_1, r2chk_2;
+  real rsm[sys->nb], rsm2[sys->nb], sigma, znode, znode2, denom, ax, ay, ar, at, axindir, ayindir;
+  real rst, rst2[sys->nb], rst3[sys->nb], rst4[sys->nb], taper, omegainv, r2, r2chk_1, r2chk_2;
   real integstar, sum, tmp, tmpbuf;
   real cs_avr, integstar_avr, sigma_avr, H_avr;
   real tau_avr=0.0, p_H_avr=0.0, p_integstar_avr=0.0, p_integstar=0.0, pax=0.0, pay=0.0, pH=0.0, Hcorr=0.0;
   Pair IndirectTermFromPlanets;
-  boolean IntegrateWithPlanet[MAXPLANETS], IntegrateLocally;
-  real axstar, aystar, hillcut[MAXPLANETS]={1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0}, mcell;
-  real rhill[MAXPLANETS], smoothing2[MAXPLANETS], Hpl[MAXPLANETS], s2[MAXPLANETS], integpl[MAXPLANETS], p_integpl[MAXPLANETS], rmorevert2[MAXPLANETS];
-  real tmparray[MAXPLANETS]={0.,0.,0.,0.,0.,0.,0.,0.,0.,0.}, axpl[MAXPLANETS]={0.,0.,0.,0.,0.,0.,0.,0.,0.,0.}, aypl[MAXPLANETS]={0.,0.,0.,0.,0.,0.,0.,0.,0.,0.};
+  boolean IntegrateWithPlanet[sys->nb], IntegrateLocally;
+  real axstar, aystar, hillcut[sys->nb], mcell;
+  real rhill[sys->nb], smoothing2[sys->nb], Hpl[sys->nb], s2[sys->nb], integpl[sys->nb], p_integpl[sys->nb], rmorevert2[sys->nb];
+  real tmparray[sys->nb], axpl[sys->nb], aypl[sys->nb];
   real *agr, *agt, *pagr, *pagt, *rho, *tau, *cs, *abs, *ord, *tqwk;
   agr = GravAccelRad->Field;
   agt = GravAccelTheta->Field;
@@ -83,8 +83,10 @@ PlanetarySystem *sys;
   axstar = 0.0;
   aystar = 0.0;
   for (k = 0; k < npl; k++) {
-    axpl[k] = 0.0;
+    axpl[k] = 0.0;	// initialize where necessary
     aypl[k] = 0.0;
+    tmparray[k] = 0.0;
+    hillcut[k] = 1.0;
     xpl = sys->x[k];
     ypl = sys->y[k];
     zpl = sys->z[k];
@@ -113,7 +115,7 @@ PlanetarySystem *sys;
   IndirectTermFromPlanets.y = - aystar;
   axstar = 0.0;	// reset the protostar's acceleration - in the following, its accel. from the disk will be computed
   aystar = 0.0;
-#pragma omp parallel for \
+#pragma omp parallel \
   firstprivate (tau_avr,p_H_avr,p_integstar_avr,p_integstar,pax,pay,pH,Hcorr) \
   private (omegainv, r2, Nvert, cs_avr, H_avr, \
 H2, zmax, deltaz, sigma_avr, integstar_avr, znode, znode2, sum, \
@@ -122,8 +124,15 @@ xpl, ypl, zpl, s2, r2chk_1, r2chk_2, IntegrateWithPlanet, integpl, p_integpl, hi
 sigma, integstar, taper, tmp, ar, mpl, at, \
 i,j,k,l,m) \
   reduction (+ : axstar,aystar)
-  // 2DO axpl[MAXPLANETS], aypl[MAXPLANETS] should also be included in reduction (this should be possible in OpenMP 4.5)
-  // 2DO and atomic clauses should be removed
+  {
+  // 2DO axpl[sys->nb], aypl[sys->nb] could also be included in reduction (this should be possible in OpenMP 4.5)
+  // below, we use a more general workaround based on thread-scoped variables axpl_priv, aypl_priv and critical sections
+  real axpl_priv[npl], aypl_priv[npl];
+  for (k=0; k<npl; k++) {
+    axpl_priv[k] = 0.0;
+    aypl_priv[k] = 0.0;
+  }
+#pragma omp for
   for (i = 0; i<nr; i++) {
     omegainv = OmegaInv[i];
     r2 = Rmed2[i];
@@ -331,8 +340,7 @@ i,j,k,l,m) \
           ax += - mpl*tmp;
           if (i>=Zero_or_active && i<Max_or_active) {
             if (ExcludeHill) tmp *= hillcut[k];
-#pragma omp atomic
-            axpl[k] += mcell*tmp;
+            axpl_priv[k] += mcell*tmp;
 	    if (TorqueDensity && GETTORQUEFORPLANET==k) tqwk[l] = -ypl*mcell*tmp;
           }
           if (zpl < - 0.05*H || zpl > 0.05*H) {
@@ -343,8 +351,7 @@ i,j,k,l,m) \
           ay += - mpl*tmp;
           if (i>=Zero_or_active && i<Max_or_active) {
             if (ExcludeHill) tmp *= hillcut[k];
-#pragma omp atomic
-            aypl[k] += mcell*tmp; 
+            aypl_priv[k] += mcell*tmp; 
 	    if (TorqueDensity && GETTORQUEFORPLANET==k) tqwk[l] += xpl*mcell*tmp;
           }
           if (Pebbles) {
@@ -362,7 +369,7 @@ i,j,k,l,m) \
             pay += -mpl*tmp;
           }          
         } else {  // simple point-mass acceleration otherwise
-          mpl *= MassTaper;
+          mpl *= MassTaper;	// note: MassTaper does not have to be used above because IntegrateWithPlanet==YES only when MassTaper == 1.0
           d2 = s2[k] + zpl*zpl + smoothing2[k];
           d = sqrt(d2);
           denom = d*d2;
@@ -370,16 +377,14 @@ i,j,k,l,m) \
           ax += - mpl*tmp;
           if (i>=Zero_or_active && i<Max_or_active) {
             if (ExcludeHill) tmp *= hillcut[k];
-#pragma omp atomic
-            axpl[k] += mcell*tmp;
+            axpl_priv[k] += mcell*tmp;
 	    if (TorqueDensity && GETTORQUEFORPLANET==k) tqwk[l] = -ypl*mcell*tmp;
           }
           tmp = (y-ypl)/denom;
           ay += - mpl*tmp;
           if (i>=Zero_or_active && i<Max_or_active) {
             if (ExcludeHill) tmp *= hillcut[k];
-#pragma omp atomic
-            aypl[k] += mcell*tmp;
+            aypl_priv[k] += mcell*tmp;
 	    if (TorqueDensity && GETTORQUEFORPLANET==k) tqwk[l] += xpl*mcell*tmp;
           }
           if (Pebbles) {
@@ -406,16 +411,22 @@ i,j,k,l,m) \
       }
     }
   }
+  #pragma omp critical
+  for (k=0; k<npl; k++) {
+    axpl[k] += axpl_priv[k];
+    aypl[k] += aypl_priv[k];
+  }
+  }	// #end of omp parallel section
   // MPI reductions
   MPI_Allreduce (&axstar, &tmpbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   IndirectTerm.x = -tmpbuf;
   MPI_Allreduce (&aystar, &tmpbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   IndirectTerm.y = -tmpbuf;
-  MPI_Allreduce (&axpl, &tmparray, 10, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce (&axpl, &tmparray, npl, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   for (k=0; k<npl; k++) {
     sys->ax[k] = tmparray[k];
   }
-  MPI_Allreduce (&aypl, &tmparray, 10, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce (&aypl, &tmparray, npl, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   for (k=0; k<npl; k++) {
     sys->ay[k] = tmparray[k];
   }
@@ -450,7 +461,7 @@ PlanetarySystem *sys;
 PolarGrid *Rho;
 real dt;		       
 {
-  int npl, k, i;
+  int npl, k, i, err;
   real x,y,z,m,vz,damp;
   char command[1024];
   npl = sys->nb;
@@ -466,10 +477,20 @@ real dt;
       for (i=1; i<CPU_Number; i++) {
         sprintf (command, "cd %s; cat gastorque%d.dat.%05d >> gastorque%d.dat",\
                  OUTPUTDIR, TimeStep, i, TimeStep);
-        system (command);
+        err = system (command);
+        if (err == -1) {
+          printf ("Error! Unable to cat output file gastorque%d.dat.%05d\n", TimeStep, i);
+          printf ("Terminating now...\n");
+          prs_exit (1);
+        }
       }
       sprintf (command, "cd %s; rm -f gastorque%d.dat.0*", OUTPUTDIR, TimeStep);
-      system (command);
+      err = system (command);
+      if (err == -1) {
+        printf ("Error! Unable to rm output file gastorque%d.dat.0*\n", TimeStep);
+        printf ("Terminating now...\n");
+        prs_exit (1);
+      }
     }
   }
   for (k = 0; k < npl; k++) {
