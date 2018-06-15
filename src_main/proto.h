@@ -130,6 +130,7 @@ void UpdateDivVelocAndStressTensor ();
 void UpdateVelocityWithViscousTerms ();
 void ImposeKeplerianEdges ();
 void ReadfromAsciiFile ();
+void IterateInitialTemperature ();
 /* #THORIN: radiative diffusion */
 void InitRadiatDiffusionFields ();
 void CalculateQminus ();
@@ -193,5 +194,8 @@ void CriticalCharTime ();
 void ParticleDiffusion ();
 void BckpFieldsForBC ();
 void ParametricAccretion ();
+void InitAccretHeatSrc ();
 /* #THORIN: tools */
 void CreateTorqueMapInfile ();
+/* */
+real OpacityBellLin ();
