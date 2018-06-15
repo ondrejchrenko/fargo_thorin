@@ -21,7 +21,6 @@ InitVariables()
   var("NINTERM", &NINTERM, INT, YES, "10.");
   var("NTOT", &NTOT, INT, YES, "1501.");
   var("OUTPUTDIR", OUTPUTDIR, STRING, YES, "~masset");
-  var("INNERBOUNDARY", OPENINNERBOUNDARY, STRING, NO, "WALL");
   var("LABELADVECTION", ADVLABEL, STRING, NO, "NO");
   var("TRANSPORT", TRANSPORT, STRING, NO, "FAST");
   var("PLANETCONFIG", PLANETCONFIG, STRING, NO, "Systems/SolarSystem.cfg");
@@ -72,13 +71,22 @@ InitVariables()
   var("STELLARRADIUS", &STELLARRADIUS, REAL, NO, "3.0");
   var("DISCALBEDO", &DISCALBEDO, REAL, NO, "0.5");
   var("PARAMETRICOPACITY", &PARAMETRICOPACITY, REAL, NO, "0.0");
+  var("ALPHAFLOCK", ALPHAFLOCK, STRING, NO, "NO");
+  var("TMRI", &TMRI, REAL, NO, "1000.0");
+  var("TWIDTH", &TWIDTH, REAL, NO, "25.0");
+  var("ALPHAMRI", &ALPHAMRI, REAL, NO, "1.9e-2");
+  var("ALPHADEAD", &ALPHADEAD, REAL, NO, "1.e-3");
+  var("ITERINITTEMPER", ITERINITTEMPER, STRING, NO, "NO");
 /* #THORIN: a new initialisation option */
   var("INITIALIZEFROMFILE", INITIALIZEFROMFILE, STRING, NO, "NO");
   var("DENSINFILE", DENSINFILE, STRING, NO, "in/gasdens.cfg");
   var("VRADINFILE", VRADINFILE, STRING, NO, "in/gasvrad.cfg");
   var("VTHETAINFILE", VTHETAINFILE, STRING, NO, "in/gasvtheta.cfg");
   var("TEMPERINFILE", TEMPERINFILE, STRING, NO, "in/gastemper.cfg");
-/* #THORIN: setup of the damping boundary condition */
+/* #THORIN: setup of the boundary conditions */
+  var("NONREFLECTING", NONREFLECTING, STRING, NO, "NO");
+  var("OPENINNER", OPENINNER, STRING, NO, "NO");
+  var("DAMPING", DAMPING, STRING, NO, "NO");
   var("DAMPTOWARDS", DAMPTOWARDS, STRING, NO, "ZEROVRAD");
   var("DAMPINGRMINFRAC", &DAMPINGRMINFRAC, REAL, NO, "1.25");
   var("DAMPINGRMAXFRAC", &DAMPINGRMAXFRAC, REAL, NO, "0.84");
