@@ -12,6 +12,8 @@ original code by Frédéric Masset
 
 #include "fargo.h"
 
+extern real MassTaper;
+
 void AccreteOntoPlanets (Rho, Vrad, Vtheta, dt, sys)	/* 2DO has to be refined for 3D orbits !! */
 real dt;
 PolarGrid *Rho, *Vrad, *Vtheta;
@@ -47,7 +49,7 @@ PlanetarySystem *sys;
       VYplanet = sys->vy[k];
       Mplanet = sys->mass[k];
       Rplanet = sqrt(Xplanet*Xplanet+Yplanet*Yplanet);
-      RRoche = pow((1.0/3.0*Mplanet),(1.0/3.0))*Rplanet; /* Central mass is 1.0 */
+      RRoche = pow((1.0/3.0*Mplanet*MassTaper),(1.0/3.0))*Rplanet; /* Central mass is 1.0 */	/* #THORIN: MassTaper kills the accretion if applied! */
       i_min=0;
       i_max=nr-1;
       while ((Rsup[i_min] < Rplanet-RRoche) && (i_min < nr)) i_min++;
