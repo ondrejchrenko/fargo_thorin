@@ -153,6 +153,10 @@ void ActualizeQbalance ();
 void GetIterStat ();
 void EmptyIterStat ();
 void DumpIterStat ();
+real opacity_const ();
+real opacity_BL94 ();
+real opacity_ZHU12 ();
+real opacity_LP85 ();
 /* #THORIN: FARGO-REBOUND interface */
 struct reb_simulation *SetupReboundSimulation ();
 void SetupIntegratorParams ();
@@ -202,6 +206,5 @@ void InitAccretHeatSrc ();
 void CreateTorqueMapInfile ();
 void WriteDiskPolarDirect ();
 /* */
-real OpacityBellLin ();
 void MdotBoundary ();
 real NuFromAlpha ();

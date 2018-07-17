@@ -43,3 +43,4 @@ boolean LogGrid;
 boolean OverridesOutputdir;
 char NewOutputdir[1024];
 FILE *plout, *discard, *mergers;  /* #THORIN */
+real (*opacity_func)(real, real); /* #THORIN */

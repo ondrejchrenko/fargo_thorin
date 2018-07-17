@@ -259,6 +259,24 @@ char *filename;
   }
   if ((*ITERINITTEMPER == 'y') || (*ITERINITTEMPER == 'Y')) IterInitTemper = YES;
   if (DISKACCRETION > 0.0) DiskAccretion = YES;
+  if (PARAMETRICOPACITY > 0.0) {
+    opacity_func = opacity_const;
+    masterprint ("Opacity is constant.\n");
+  } else if (*OPACITYLAW== 'Z') {
+    opacity_func = opacity_ZHU12;
+    masterprint ("Opacity is from Zhu etal. (2012).\n");
+  } else if (*OPACITYLAW == 'L') {
+    opacity_func = opacity_LP85;
+    masterprint ("Opacity is from Lin & Papaloizou (1985).\n");
+  } else if (*OPACITYLAW == 'B') {
+    opacity_func = opacity_BL94;
+    masterprint ("Opacity is from Bell & Lin (1994).\n");
+  } else {
+    masterprint ("Unrecognized opacity option.\n");
+    masterprint ("Use OpacityLaw 'B' or 'L' or 'Z' or non-zero ParametricOpacity.\n");
+    masterprint ("Terminating now...\n");
+    prs_exit (1);
+  }
 }
 
 void PrintUsage (execname)
