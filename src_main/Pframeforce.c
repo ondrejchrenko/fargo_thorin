@@ -524,7 +524,7 @@ real m,x,y,z,vz;
   ns = Rho->Nsec;
   cs = SoundSpeed->Field;
   r = sqrt(x*x + y*y);          /* find position in the midplane */
-  if ( (VERTICALDAMPING > 0.0) && (z>0.0) && (r >= Rinf[Zero_or_active] && r <= Rsup[Max_or_active-1]) ) {
+  if ( (VERTICALDAMPING > 0.0) && (z!=0.0) && (r >= Rinf[Zero_or_active] && r <= Rsup[Max_or_active-1]) ) {
      /* condition satisfied only for a CPU which contains the planet within its active zone */
     ang = atan2(y,x);           /* get the damping value on this cpu */
     if (ang < 0.0) ang += 2.0*PI;
