@@ -18,8 +18,8 @@ real QplusMed[MAX1D], CoolingTimeMed[MAX1D];				/* #THORIN */
 real PebDensInit[MAX1D], PebVradInit[MAX1D], PebVthetaInit[MAX1D];	/* #THORIN */
 real vt1D[MAX1D], invdtpeb_sq, invdtreb_sq, SQRT_ADIABIND_INV;		/* #THORIN */
 real OmegaFrame, PhysicalTime=0.0, PhysicalTimeInitial;
-real *heatsrc;								/* #THORIN */
-int heatsrc_max;							/* #THORIN */
+real *heatsrc, glob_omega, glob_domega;					/* #THORIN */
+int heatsrc_max, glob_niterlast, glob_itercount;			/* #THORIN */
 int TimeStep=0;
 boolean EnergyEq, StoreEnergy, ParametricCooling, Damping, DampVrad, DampInit, DampAlphaVeloc, StellarIrradiation;	/* #THORIN */
 boolean InitFromFile, Write_Temperature, Write_Energy, Write_Divergence, Write_Qplus, Write_Qbalance;			/*#THORIN*/

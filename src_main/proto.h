@@ -150,6 +150,9 @@ void ChessBoardIndexing ();
 void SetWaveKillingZones ();
 void DampingBoundary ();
 void ActualizeQbalance ();
+void GetIterStat ();
+void EmptyIterStat ();
+void DumpIterStat ();
 /* #THORIN: FARGO-REBOUND interface */
 struct reb_simulation *SetupReboundSimulation ();
 void SetupIntegratorParams ();

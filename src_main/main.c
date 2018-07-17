@@ -114,7 +114,7 @@ char *argv[];
   }
   if (Merge && MergeDirect) {
     mastererr ("ERROR - You cannot use -m and -M switches at the same time.\n");
-    mastererr ("Restart using only one of them to merge the output files\n");
+    mastererr ("Restart with only one of them to merge the output files\n");
     mastererr ("from individual CPUs. Terminating now...\n");
     prs_exit (1);
   }
@@ -154,7 +154,12 @@ char *argv[];
   Initialization (gas_density, gas_v_rad, gas_v_theta, gas_energy, gas_label); /* #THORIN */
   if (AccretHeating) InitAccretHeatSrc (sys->nb);	/* #THORIN */
   InitComputeAccel ();
-  if (Restart) OmegaFrame = GetOmegaFrame (NbRestart);	/* #THORIN */
+  if (Restart) {					/* #THORIN */
+    OmegaFrame = GetOmegaFrame (NbRestart);
+    GetIterStat (NbRestart);
+  } else {
+    EmptyIterStat ();
+  }
   PhysicalTimeInitial = PhysicalTime;
   MultiplyPolarGridbyConstant (gas_density, ScalingFactor);
   for (i = begin_i; i <= NTOT; i++) {
@@ -170,6 +175,7 @@ char *argv[];
       if (WriteTorqueMapFile) CreateTorqueMapInfile (TimeStep, gas_density);	/* #THORIN */
       if (TorqueDensity) DumpTorqueDensNow=YES;					/* #THORIN */
       DumpOmegaFrame (TimeStep);			/* #THORIN: print OmegaFrame - it is needed for restart runs */
+      DumpIterStat (TimeStep);				/* #THORIN: output info about the SOR setup - it is needed for restart runs */
       if ((OnlyInit) || ((GotoNextOutput) && (!StillWriteOneOutput))) {
 	MPI_Finalize();
 	return 0;

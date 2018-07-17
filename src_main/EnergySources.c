@@ -48,6 +48,8 @@ static real omegabest, domega;	// optimum relaxation parameter for SOR and its s
 static int Niterbest;		// minimum number of iterations reached when minimizing the relaxation parameter
 static int jchess1st, jchess2nd;
 
+extern boolean Restart;
+
 /** Initialises the polar arrays associated with the heating/cooling
  * processes */
 void InitRadiatDiffusionFields ()
@@ -304,11 +306,23 @@ real dt;
     }
   }
   } /* #end of omp parallel section */
+  if (Restart && first) {
+    first = NO;
+    masterprint ("Restarting SOR with:\n");
+    masterprint ("\trelaxation parameter omega = %#.6g\n", glob_omega);
+    masterprint ("\tupcoming variation domega = %#.6g\n", glob_domega);
+    masterprint ("\tlast no. of iterations = %d\n", glob_niterlast);
+    masterprint ("\ttotal no. of iterations = %d\n", glob_itercount);
+    omega = glob_omega;
+    domega = glob_domega;
+    Niterlast = glob_niterlast;
+  }
   if (first) {
     first = NO;
     IterateRelaxationParameter ();
     omega = omegabest;
     Niterlast = Niterbest;
+    glob_itercount = 0;
   }
   omega += domega;		// always try to change the relax. parameter a little (domega set in IterateRelaxationParameter())
   if (omega > 1.999999) {	// stay in the [1,2) interval
@@ -322,6 +336,12 @@ real dt;
   Niter = SuccessiveOverrelaxation (omega, YES);	// solve the implicit eq. with SOR; YES means that the program will crash when exceeding SORMAXITERS
   if (Niter > Niterlast) domega = - domega;		// if the performance is worse than in the previous case, apply the opposite change next time
   Niterlast = Niter;					// (in this way, omega oscillates around the optimum value)
+  // new output variables for 1:1 restarts
+  glob_omega = omega;
+  glob_domega = domega;
+  glob_niterlast = Niterlast;
+  glob_itercount += Niterlast;
+  //
   if (CPU_Number > 1) SynchronizeOverlapFields (temper, nr, CPUOVERLAP);      /* fill the overlapping ghost zones with values from the neighbouring CPU's active mesh */
   if (CPU_Rank == 0) {		// get the temperature in the innermost and outermost ring by adopting the neighbouring value
     for (j=0; j<ns; j++) {

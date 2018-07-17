@@ -355,3 +355,78 @@ int TimeStep;
   return (real)value;
 }
 
+/** Empty file 'iterstat.dat' */
+void EmptyIterStat ()	/* #THORIN */
+{
+  if (!CPU_Master) return;
+  FILE *output;
+  char name[256];
+  sprintf (name, "%siterstat.dat", OUTPUTDIR);
+  output = fopenp (name, "w");
+  fclose (output);
+}
+
+/** Write an entry into file 'iterstat.dat'.
+ * One entry contains the last omega parameter for SOR,
+ * its upcoming variation domega, last number of iterations,
+ * and total number of iterations in the simulation. */
+void DumpIterStat (int TimeStep)	/* #THORIN */
+{
+  if (!CPU_Master) return;
+  FILE *output;
+  char name[256];
+  fflush (stdout);
+  sprintf (name, "%siterstat.dat", OUTPUTDIR);
+  output = fopenp (name, "a");
+  fprintf (output, "%d\t%#.18g\t%#.18g\t%d\t%d\n",\
+           TimeStep, glob_omega, glob_domega, glob_niterlast, glob_itercount);
+  fclose (output);
+  masterprint ("Last relaxation parameter in SOR: %#.6g\n", glob_omega);
+  masterprint ("Last no. of iterations in SOR: %d\n", glob_niterlast);
+  masterprint ("Total no. of iterations in SOR: %d\n", glob_itercount);
+  fflush (stdout);
+}
+
+/** Read an entry from file 'iterstat.dat' corresponding
+ * to the restart output number. */
+void GetIterStat (int TimeStep)		/* #THORIN */
+{
+  FILE *input;
+  char name[256];
+  char testline[256];
+  int time, ivalue;
+  char *pt;
+  double value;
+  sprintf (name, "%siterstat.dat", OUTPUTDIR);
+  input = fopen (name, "r");
+  if (input == NULL) {
+    mastererr ("Can't read 'iterstat.dat' file. Aborting restart.\n");
+    prs_exit (1);
+  }
+  do {
+    pt = fgets (testline, 255, input);
+    sscanf (testline, "%d", &time);
+  } while ((time != TimeStep) && (pt != NULL));
+  if (pt == NULL) {
+    mastererr ("Can't read entry %d in 'iterstat.dat' file. Aborting restart.\n", TimeStep);
+    prs_exit (1);
+  }
+  fclose (input);
+  pt = testline;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%lf", &value);
+  glob_omega = (real)value;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%lf", &value);
+  glob_domega = (real)value;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%d", &ivalue);
+  glob_niterlast = (int)ivalue;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%d", &ivalue);
+  glob_itercount = (int)ivalue;
+}
