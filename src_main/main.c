@@ -45,7 +45,7 @@ char *argv[];
   strcpy (ParameterFile, "");
   for (i = 1; i < argc; i++) {
     if (*(argv[i]) == '-') {
-      if (strspn (argv[i], "-secndovtpfamzib0123456789") != strlen (argv[i]))
+      if (strspn (argv[i], "-secndovtpfamzibM0123456789") != strlen (argv[i]))	/* #THORIN */
 	PrintUsage (argv[0]);
       if (strchr (argv[i], 'n'))
 	disable = YES;
@@ -63,6 +63,9 @@ char *argv[];
 	CentrifugalBalance = YES;
       if (strchr (argv[i], 'm'))
 	Merge = YES;
+      if (strchr (argv[i], 'M'))		/* #THORIN */
+	MergeDirect = YES;
+      if (strchr (argv[i], 'a'))
       if (strchr (argv[i], 'a'))
 	MonitorIntegral = YES;
       if (strchr (argv[i], 'z'))
@@ -107,7 +110,13 @@ char *argv[];
     mastererr ("You cannot use tabulated surface density\n");
     mastererr ("or surface internal energy in a non-restart run.\n");
     mastererr ("Aborted\n");
-    prs_exit (0);
+    prs_exit (1);
+  }
+  if (Merge && MergeDirect) {
+    mastererr ("ERROR - You cannot use -m and -M switches at the same time.\n");
+    mastererr ("Restart using only one of them to merge the output files\n");
+    mastererr ("from individual CPUs. Terminating now...\n");
+    prs_exit (1);
   }
   if (ParameterFile[0] == 0) PrintUsage (argv[0]);
   ReadVariables (ParameterFile);	/* #THORIN: InitPlanetarySystem() and ListPlanets() used to be here, replaced by functions of the Rebound interface */

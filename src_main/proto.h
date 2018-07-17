@@ -197,6 +197,7 @@ void ParametricAccretion ();
 void InitAccretHeatSrc ();
 /* #THORIN: tools */
 void CreateTorqueMapInfile ();
+void WriteDiskPolarDirect ();
 /* */
 real OpacityBellLin ();
 void MdotBoundary ();

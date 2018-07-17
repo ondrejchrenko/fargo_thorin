@@ -150,6 +150,50 @@ int timestep;
   }
 }
 
+/** Modified WriteDiskPolar() function to merge MPI outputs automatically
+ *  (all CPU_Ranks will write sequentially into a single file).
+ *  The function is inspired by a similar solution in Fargo3D. */
+void WriteDiskPolarDirect (array, number)      /* #THORIN */
+PolarGrid       *array;
+int              number;
+{
+  int             Nr, Ns, relay;
+  FILE           *dump;
+  char          name[80];
+  real          *ptr;
+  ptr = array->Field;
+  Nr = array->Nrad;
+  Ns = array->Nsec;
+  sprintf (name, "%s%s%d.dat", OUTPUTDIR, array->Name, number);
+  if (CPU_Master) {
+    dump = fopenp (name, "wb");
+    fclose(dump);
+  }
+  masterprint ("Writing '%s%d.dat'...", array->Name, number);
+  fflush (stdout);
+/* We  strip  the first CPUOVERLAP rings  if  the  current  CPU  is not  the
+   innermost one */
+  if (CPU_Rank > 0) {
+    ptr += CPUOVERLAP*Ns;
+    Nr -=CPUOVERLAP ;
+  }
+/* We strip the last CPUOVERLAP rings if the current CPU is not the outermost
+   one */
+  if (CPU_Rank < CPU_Number-1) {
+    Nr -=CPUOVERLAP;
+  }
+  /* Write only when message from a previous CPU is received */
+  if (CPU_Rank > 0) MPI_Recv (&relay, 1, MPI_INT, CPU_Rank-1, 42, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  dump = fopenp (name, "a+b");
+  fwrite (ptr, sizeof(real), Nr*Ns,dump);
+  fclose(dump);
+  /* Send message to the next CPU that it can start writing */
+  if (CPU_Rank < CPU_Number-1) MPI_Send(&relay, 1, MPI_INT, CPU_Rank+1, 42, MPI_COMM_WORLD);
+  MPI_Barrier (MPI_COMM_WORLD);
+  masterprint("done\n");
+  fflush (stdout);
+}
+
 void WriteDiskPolar(array, number)
 PolarGrid 	*array;
 int 	         number;
@@ -159,6 +203,10 @@ int 	         number;
   char 		name[80];
   real 		*ptr;
   ptr = array->Field;
+  if (MergeDirect) {				/* #THORIN */
+    WriteDiskPolarDirect (array, number);
+    return;
+  }
   if (CPU_Master)
     sprintf (name, "%s%s%d.dat", OUTPUTDIR, array->Name, number);
   else

@@ -26,6 +26,7 @@ boolean InitFromFile, Write_Temperature, Write_Energy, Write_Divergence, Write_Q
 boolean Collisions, WriteTorque, WriteTorqueMapFile, MonitorNPL, FeelDisk;  				/* #THORIN */
 boolean Pebbles, Write_Eta, AccretHeating, BackReaction, ActualizeLuminosity, DiffusiveParticles, PrescribedAccretion; 	/* #THORIN */
 boolean *heatsrc_index, TorqueDensity, AlphaFlock, IterInitTemper, DiskAccretion;	/* #THORIN */
+boolean MergeDirect;									/* #THORIN */
 boolean Merge, AdvecteLabel, FakeSequential, MonitorIntegral, debug, OnlyInit;
 boolean	GotoNextOutput, StoreSigma, ViscosityAlpha, RocheSmoothing;
 boolean CentrifugalBalance, ExcludeHill, SloppyCFL;
