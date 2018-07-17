@@ -18,8 +18,8 @@
 
 #include "fargo.h"
 
-#define TRAPEZMAX 35
-#define TRAPEZEPS 1.0e-7
+#define TRAPEZMAX 16
+#define TRAPEZEPS 1.0e-4
 
 extern boolean Restart, FastTransport;
 extern real MassTaper;
@@ -289,16 +289,17 @@ real a, b, H2;
 {
   static real integral;
   real iter, spacing, x, sum;
-  int j;
+  int j, it;
   if (n==1) {
     integral = 0.5*(b-a)*(exp(-0.5*a*a/H2) + exp(-0.5*b*b/H2));
     return integral;
   } else {
-    iter = pow(2.0,(real)(n-2));
+    for (it=1, j=1; j<n-1; j++) it <<= 1;
+    iter = it;
     spacing = (b-a)/iter;
     x = a + 0.5*spacing;
     sum = 0.0;
-    for (j=1; j<=(int)iter; j++) {
+    for (j=1; j<=it; j++) {
       sum += exp(-0.5*x*x/H2);
       x += spacing;
     }
