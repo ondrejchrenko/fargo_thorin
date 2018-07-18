@@ -195,7 +195,7 @@ PolarGrid *VolumeDensity, *Temperature, *Opacity;
     return;
   }
 
-#pragma omp parallel for default(none) shared(nr,ns,temper,voldens,opacity) private(i,j,l)
+#pragma omp parallel for default(none) shared(nr,ns,temper,voldens,opacity,opacity_func) private(i,j,l)
   for (i=0; i<nr; i++) {
     for (j=0; j<ns; j++) {
       l = j + i*ns;

@@ -102,7 +102,7 @@ ParticleDiffusion	NO
 WriteEta                NO
 PebbleFlux		0.0002
 PebbleAlpha             0.0001          ! should be the same as the gas alpha (when used)
-SchmidtNumber		1.0
+FragmentVeloc		1000.0		[cm/s]
 PebbleCoagulation       0.5
 PebbleBulkDens		1.0
 

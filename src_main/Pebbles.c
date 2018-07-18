@@ -83,9 +83,11 @@ PolarGrid *Rho, *Vrad;
 {
   static real pebbleflux=0.0;
   int i,j,l,nr,ns,err;
-  real *rho, *vr, *etafc, *etacc, *psize, *tau, *pdens, *pvr, *pvt;
+  int ndrift=0,nfrag=0;
+  real *rho, *vr, *etafc, *etacc, *psize, *tau, *pdens, *pvr, *pvt, *cs;
   real rho1, vr1, etafc1, etacc1;	// index 1 is for azimuthally averaged vars
   real pdens1, psize1, tau1, pvr1, pvt1;
+  real cs1, tauf;
   real vtcorr, vkepl, fac, etaterm, pvrtemp;
   char command[1024];
   if (pebbleflux==0.0) pebbleflux = PEBBLEFLUX*FLUX2CU;
@@ -98,6 +100,7 @@ PolarGrid *Rho, *Vrad;
   vr = Vrad->Field;
   etafc = EtaFaceCentered->Field;
   etacc = EtaCellCentered->Field;
+  cs = SoundSpeed->Field;
   nr = Rho->Nrad;
   ns = Rho->Nsec;
   for (i=0; i<nr; i++) {
@@ -106,21 +109,32 @@ PolarGrid *Rho, *Vrad;
     vr1 = 0.0;
     etafc1 = 0.0;
     etacc1 = 0.0;
+    cs1 = 0.0;
     for (j=0; j<ns; j++) {
       l = j + i*ns;
       rho1 += rho[l];
       vr1 += vr[l];
       etafc1 += etafc[l];
       etacc1 += etacc[l];
+      cs1 += cs[l];
     }
     rho1 /= (real)ns;
     vr1 /= (real)ns;
     etafc1 /= (real)ns;
     etacc1 /= (real)ns;
+    cs1 /= (real)ns;
     // 1D steady-state profiles
     tau1 = sqrt(3.0)*PEBBLECOAGULATION*pebbleflux/(32.0*PI*pow(Rmed[i],-1.5)*rho1);	// dominant Stokes number from 2 parameters + hydro quantities
     tau1 = sqrt(tau1)/(Rmed[i]*etacc1);
-    psize1 = sqrt(ADIABIND)*tau1*rho1/(2.0*pebbulkdens);     // pebble size corresponding to the dominant Stokes from Epstein law
+    // if pebbles are fragmentation limited, use the smaller size
+    tauf = 1.0/(3.0*PEBBLEALPHA)*pow(FRAGMENTVELOC/VELOC2CGS/cs1, 2.0);
+    if (tauf < tau1) {
+      tau1 = tauf;
+      nfrag++;
+    } else {
+      ndrift++;
+    }
+    psize1 = sqrt(ADIABIND)*tau1*rho1/(sqrt(2.0*PI)*pebbulkdens);     // pebble size corresponding to the dominant Stokes from Epstein law
     vtcorr = Rmed[i]*OmegaFrame;				// steady-state drift velocity part, serves also as the initialization |--------->
     vkepl = pow (Rmed[i], -0.5);
     fac = 1.0/(tau1*tau1 + 1.0);
@@ -145,6 +159,7 @@ PolarGrid *Rho, *Vrad;
     PebVradInit[i] = pvr1;
     PebVthetaInit[i] = pvt1 + Rmed[i]*OmegaFrame;	// transform back to intertial value
   }
+  masterprint ("Pebble statistics: %d rings with fragmentation-limited size, %d rings with drift-limited size.\n", nfrag, ndrift);
   WriteDiskPolar (StokesNumber, 0);
   WriteDiskPolar (PebbleSize, 0);
   if (Merge && (CPU_Number > 1)) {
@@ -654,24 +669,26 @@ void ParticleDiffusion (Rho)
 PolarGrid *Rho;
 {
   int i,j,l,lim,ljm,nr,ns;
-  real corr, dxtheta, invdxtheta;
-  real *rho, *pdens, *pvr, *pvt;
+  real corr, dxtheta, invdxtheta, Sc;
+  real *rho, *pdens, *pvr, *pvt, *tau;
   rho = Rho->Field;
   nr = Rho->Nrad;
   ns = Rho->Nsec;
   pdens = PebbleDens->Field;
   pvr = PebbleVrad->Field;
   pvt = PebbleVtheta->Field;
+  tau = StokesNumber->Field;
 #pragma omp parallel default(none) \
-  shared (nr,ns,Rinf,SCHMIDTNUMBER,rho,pdens,InvDiffRmed,pvr,Rmed,pvt) \
-  private (i,j,l,lim,ljm,corr,dxtheta,invdxtheta)
+  shared (nr,ns,Rinf,rho,pdens,InvDiffRmed,pvr,Rmed,pvt,tau) \
+  private (i,j,l,lim,ljm,corr,dxtheta,invdxtheta,Sc)
   {
 #pragma omp for
   for (i=1; i<nr; i++) {
     for (j=0; j<ns; j++) {
       l = j + i*ns;
       lim = l - ns;
-      corr = -FViscosity(Rinf[i])/SCHMIDTNUMBER;
+      Sc = 1.0 + tau[l]*tau[l];		/* Youdin & Lithwick 2007 */
+      corr = -FViscosity(Rinf[i])/Sc;
       corr *= (rho[l] + rho[lim])/(pdens[l] + pdens[lim]);
       corr *= (pdens[l]/rho[l] - pdens[lim]/rho[lim])*InvDiffRmed[i];
       pvr[l] += corr;
@@ -685,7 +702,8 @@ PolarGrid *Rho;
       l = j + i*ns;
       ljm = l-1;
       if (j == 0) ljm = i*ns+ns-1;
-      corr = -FViscosity(Rmed[i])/SCHMIDTNUMBER;
+      Sc = 1.0 + tau[l]*tau[l];
+      corr = -FViscosity(Rmed[i])/Sc;
       corr *= (rho[l] + rho[ljm])/(pdens[l] + pdens[ljm]);
       corr *= (pdens[l]/rho[l] - pdens[ljm]/rho[ljm])*invdxtheta;
       pvt[l] += corr;

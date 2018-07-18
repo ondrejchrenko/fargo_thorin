@@ -77,6 +77,6 @@ HeatingDelay		100		Slowly introduce the accretion heating into calculation
 ParticleDiffusion	YES		Include the particle diffusion term
 PebbleFlux		0.0002		Initial radial pebble mass flux in Earth masses per yr
 PebbleAlpha             0.0001		Turbulent alpha parameter for solid particles
-SchmidtNumber		1.0		Schmidt number for the diffusion term
+FragmentVeloc		1000.0		[cm/s] Fragmentation velocity of pebbles
 PebbleCoagulation       0.5		Coagulation efficiency of the Lambrechts & Johansen (2014) model
 PebbleBulkDens		1.0		Material density of pebbles

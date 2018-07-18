@@ -52,4 +52,5 @@ original code by Frédéric Masset
 #define SIGMA2CGS (MSOL_SI*1000.0/pow(AU_SI*100.0,2.0))
 #define PRESS2CGS (MSOL_SI*1000.0/(AU_SI*100.0*TIME2SI*TIME2SI))
 #define FLUX2CU (0.000003/(2.0*PI))	/* (radial flux in earth masses per year) * FLUX2CU = (radial flux in code units) */
+#define VELOC2CGS ((AU_SI*100.0)/TIME2SI)
 /* #THORIN <----- */

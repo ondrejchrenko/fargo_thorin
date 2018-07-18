@@ -183,7 +183,7 @@ int              number;
     Nr -=CPUOVERLAP;
   }
   /* Write only when message from a previous CPU is received */
-  if (CPU_Rank > 0) MPI_Recv (&relay, 1, MPI_INT, CPU_Rank-1, 42, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  if (CPU_Rank > 0) MPI_Recv (&relay, 1, MPI_INT, CPU_Rank-1, 42, MPI_COMM_WORLD, &fargostat);
   dump = fopenp (name, "a+b");
   fwrite (ptr, sizeof(real), Nr*Ns,dump);
   fclose(dump);
