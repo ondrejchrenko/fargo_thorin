@@ -1,30 +1,30 @@
-### hydrodynamic arrays initialised from files
-### (useful when starting with an equilibrium disc)
+### Disk parameters
+
+AspectRatio             0.05            InitializeFromFile applied instead, see below...
+SigmaSlope              0.5             -||-
+Sigma0                  8.4375e-5       -||-
+FlaringIndex		0.0		-||-
+Viscosity		1.2214e-5	[code units] (e.g. 1.2214e-5 equals 5.0e14 cm^2/s)
+
+### Energy equation setup
+
+EnergyEquation          YES		starts non-isothermal calculations
+Adiabind                1.4		adiabatic index
+StellarIrradiation      YES		account for stellar irradiation
+OpacityDrop		0.6		reduction factor in the estimate of vertical radiative cooling
+EffectiveTemperature    4370.0          [Kelvin] protostar's temperature
+StellarRadius           1.5             [R_sun] protostar's radius
+DiscAlbedo              0.5
+OpacityLaw		BELL		BELL or LIN or ZHU (for Bell & Lin 94, Lin & Papa 85, Zhu et al 12)
+
+### HD field initialization from files
+### (useful to start with an equilibrium disc)
 
 InitializeFromFile      YES		will initialise the gas disk from files below
 DensInfile              in_wplanet/gasdens.cfg
 VradInfile              in_wplanet/gasvrad.cfg
 VthetaInfile            in_wplanet/gasvtheta.cfg
 TemperInfile            in_wplanet/gastemper.cfg
-
-### Disk parameters
-
-AspectRatio             0.05            relaxed disk is used to initialise
-Viscosity               1.12214e-5      5.0e14 cm^2/s
-SigmaSlope              0.5             relaxed disk is used to initialise
-FlaringIndex            0.0             relaxed disk is used to initialise
-Sigma0                  8.4375e-5       relaxed disk is used to initialise
-
-### Energy equation setup
-
-EnergyEquation          YES		starts non-isothermal calculations
-Adiabind                1.4             adiabatic index
-StellarIrradiation      YES		account for stellar irradiation
-OpacityDrop		0.6		reduction factor in the estimate of vertical radiative cooling
-EffectiveTemperature    4370.0          protostar's temperature in Kelvins
-StellarRadius           1.5             protostar's radius in solar radii
-DiscAlbedo              0.5		albedo of the disk
-WriteTemperature        YES             Yes is default if EnergyEquation=Yes is chosen
 
 ### Planet parameters
 
@@ -35,7 +35,7 @@ ExcludeHill             YES             exclude part of the Hill sphere gas from
 ### Numerical method parameters
 
 Transport               FARGO
-InnerBoundary           DAMPING
+Damping			YES
 DampTowards             INIT		now we damp towards the initial relaxed values
 DampingRminFrac		1.2
 DampingRmaxFrac		0.9
@@ -60,7 +60,7 @@ Ninterm                 100
 DT                      3.725
 OutputDir               out_wplanet
 
-### Planetary system calculations
+###
 NoutElements            5		Analogue of Ninterm for the output of orb. elements
 WriteTorqueFiles        YES		Measure and write the disk torque
 PlanetsFeelDisk         YES		Planet is allowed to migrate
@@ -76,7 +76,7 @@ AccretionalHeating      YES		Account for accretion heating
 HeatingDelay		100		Slowly introduce the accretion heating into calculation
 ParticleDiffusion	YES		Include the particle diffusion term
 PebbleFlux		0.0002		Initial radial pebble mass flux in Earth masses per yr
-PebbleAlpha             0.0001          Turbulent alpha parameter for solid particles
-SchmidtNumber		1.0		Schmidt numer for the diffusion term
+PebbleAlpha             0.0001		Turbulent alpha parameter for solid particles
+SchmidtNumber		1.0		Schmidt number for the diffusion term
 PebbleCoagulation       0.5		Coagulation efficiency of the Lambrechts & Johansen (2014) model
 PebbleBulkDens		1.0		Material density of pebbles

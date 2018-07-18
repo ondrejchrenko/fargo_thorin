@@ -139,10 +139,10 @@ void DumpSources (argc, argv)
   system (CommandLine);
 }
 
-void MakeDir (string)
+void MakeDir (string)		/* #THORIN: check errors of system() command */
      char *string;
 {
-  int foo=0;
+  int foo=0,err;
   char command[MAX1D];
   DIR *dir;
   /* Each processor tries to create the directory, sequentially */
@@ -154,7 +154,12 @@ void MakeDir (string)
   } else {
     fprintf (stdout, "Process %d creates the directory %s\n", CPU_Rank, string);
     sprintf (command, "mkdir -p %s", string);
-    system (command);
+    err = system (command);
+    if (err==-1) {
+      printf ("Error! Process %d unable to create the output directory.\n", CPU_Rank);
+      printf ("Terminating now...\n");
+      prs_exit (1);
+    }
   }
   if (CPU_Rank < CPU_Number-1) MPI_Send (&foo, 1, MPI_INT, CPU_Rank+1, 53, MPI_COMM_WORLD);
 }

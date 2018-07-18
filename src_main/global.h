@@ -13,19 +13,20 @@ real InvRmed[MAX1D], InvSurf[MAX1D], InvDiffRmed[MAX1D];
 real InvDiffRsup[MAX1D], InvRinf[MAX1D], Radii[MAX1D], GlobalRmed[MAX1D];
 real SigmaMed[MAX1D], SigmaInf[MAX1D], MassTaper;
 real OmegaInv[MAX1D], Rmed2[MAX1D];					/* #THORIN */
-real EnergyMed[MAX1D], globpressvec[MAX1D], globcsvec[MAX1D], WaveKiller[MAX1D], VthetaMed[MAX1D];	/* #THORIN */
+real EnergyMed[MAX1D], globpressvec[MAX1D], globcsvec[MAX1D], globtvec[MAX1D], WaveKiller[MAX1D], VthetaMed[MAX1D];	/* #THORIN */
 real QplusMed[MAX1D], CoolingTimeMed[MAX1D];				/* #THORIN */
 real PebDensInit[MAX1D], PebVradInit[MAX1D], PebVthetaInit[MAX1D];	/* #THORIN */
 real vt1D[MAX1D], invdtpeb_sq, invdtreb_sq, SQRT_ADIABIND_INV;		/* #THORIN */
 real OmegaFrame, PhysicalTime=0.0, PhysicalTimeInitial;
-real heatsrc[MAXPLANETS];						/* #THORIN */
-int heatsrc_max;							/* #THORIN */
+real *heatsrc, glob_omega, glob_domega;					/* #THORIN */
+int heatsrc_max, glob_niterlast, glob_itercount;			/* #THORIN */
 int TimeStep=0;
-boolean EnergyEq, StoreEnergy, ParametricCooling, Damping, DampVrad, DampInit, StellarIrradiation;	/* #THORIN */
+boolean EnergyEq, StoreEnergy, ParametricCooling, Damping, DampVrad, DampInit, DampAlphaVeloc, StellarIrradiation;	/* #THORIN */
 boolean InitFromFile, Write_Temperature, Write_Energy, Write_Divergence, Write_Qplus, Write_Qbalance;			/*#THORIN*/
 boolean Collisions, WriteTorque, WriteTorqueMapFile, MonitorNPL, FeelDisk;  				/* #THORIN */
 boolean Pebbles, Write_Eta, AccretHeating, BackReaction, ActualizeLuminosity, DiffusiveParticles, PrescribedAccretion; 	/* #THORIN */
-boolean heatsrc_index[MAXPLANETS], TorqueDensity;	/* #THORIN */
+boolean *heatsrc_index, TorqueDensity, AlphaFlock, IterInitTemper, DiskAccretion;	/* #THORIN */
+boolean MergeDirect;									/* #THORIN */
 boolean Merge, AdvecteLabel, FakeSequential, MonitorIntegral, debug, OnlyInit;
 boolean	GotoNextOutput, StoreSigma, ViscosityAlpha, RocheSmoothing;
 boolean CentrifugalBalance, ExcludeHill, SloppyCFL;
@@ -42,3 +43,4 @@ boolean LogGrid;
 boolean OverridesOutputdir;
 char NewOutputdir[1024];
 FILE *plout, *discard, *mergers;  /* #THORIN */
+real (*opacity_func)(real, real); /* #THORIN */

@@ -64,8 +64,6 @@ typedef struct polargrid PolarGrid;
 
 #define		MAX1D	16384
 
-#define		MAXPLANETS	10
-
 /** The Param structure handles the parameters of the parameter
 file. It allows to associate the values found in the file to the
 strings defining the parameters, and ultimately to the global

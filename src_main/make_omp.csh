@@ -1,16 +1,15 @@
-#!/bin/bash
+#!/bin/csh
 
-# FARGO_THORIN compilation shell script
+# FARGO_THORIN compilation C-shell script
 # for a single-machine build with multithread support.
 #
 # Copyright (C) 2017 Ondřej Chrenko
 # email: chrenko@sirrah.troja.mff.cuni.cz
 #
-# Similar to make.sh, but setting OPENMP=1 enables
-# the OpenMP support.
+# Note: uses the icc compiler
 
-export CC=gcc
-export OPENMP=1
+setenv CC icc
+setenv OPENMP 1
 make -f makefile.reb
-export FARGO_ARCH=THORIN
+setenv FARGO_ARCH THORIN
 make BUILD=sequential

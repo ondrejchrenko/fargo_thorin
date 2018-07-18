@@ -20,6 +20,8 @@
 # REBOUND library 'librebound.so'. Next it issues 'makefile'
 # to compile the code using the THORIN build.
 
+export CC=gcc
+export OPENMP=
 make -f makefile.reb
 export FARGO_ARCH=THORIN
 make BUILD=sequential

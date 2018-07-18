@@ -150,6 +150,50 @@ int timestep;
   }
 }
 
+/** Modified WriteDiskPolar() function to merge MPI outputs automatically
+ *  (all CPU_Ranks will write sequentially into a single file).
+ *  The function is inspired by a similar solution in Fargo3D. */
+void WriteDiskPolarDirect (array, number)      /* #THORIN */
+PolarGrid       *array;
+int              number;
+{
+  int             Nr, Ns, relay;
+  FILE           *dump;
+  char          name[80];
+  real          *ptr;
+  ptr = array->Field;
+  Nr = array->Nrad;
+  Ns = array->Nsec;
+  sprintf (name, "%s%s%d.dat", OUTPUTDIR, array->Name, number);
+  if (CPU_Master) {
+    dump = fopenp (name, "wb");
+    fclose(dump);
+  }
+  masterprint ("Writing '%s%d.dat'...", array->Name, number);
+  fflush (stdout);
+/* We  strip  the first CPUOVERLAP rings  if  the  current  CPU  is not  the
+   innermost one */
+  if (CPU_Rank > 0) {
+    ptr += CPUOVERLAP*Ns;
+    Nr -=CPUOVERLAP ;
+  }
+/* We strip the last CPUOVERLAP rings if the current CPU is not the outermost
+   one */
+  if (CPU_Rank < CPU_Number-1) {
+    Nr -=CPUOVERLAP;
+  }
+  /* Write only when message from a previous CPU is received */
+  if (CPU_Rank > 0) MPI_Recv (&relay, 1, MPI_INT, CPU_Rank-1, 42, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  dump = fopenp (name, "a+b");
+  fwrite (ptr, sizeof(real), Nr*Ns,dump);
+  fclose(dump);
+  /* Send message to the next CPU that it can start writing */
+  if (CPU_Rank < CPU_Number-1) MPI_Send(&relay, 1, MPI_INT, CPU_Rank+1, 42, MPI_COMM_WORLD);
+  MPI_Barrier (MPI_COMM_WORLD);
+  masterprint("done\n");
+  fflush (stdout);
+}
+
 void WriteDiskPolar(array, number)
 PolarGrid 	*array;
 int 	         number;
@@ -159,6 +203,10 @@ int 	         number;
   char 		name[80];
   real 		*ptr;
   ptr = array->Field;
+  if (MergeDirect) {				/* #THORIN */
+    WriteDiskPolarDirect (array, number);
+    return;
+  }
   if (CPU_Master)
     sprintf (name, "%s%s%d.dat", OUTPUTDIR, array->Name, number);
   else
@@ -307,3 +355,80 @@ int TimeStep;
   return (real)value;
 }
 
+/** Empty file 'iterstat.dat' */
+void EmptyIterStat ()	/* #THORIN */
+{
+  if (!CPU_Master) return;
+  FILE *output;
+  char name[256];
+  sprintf (name, "%siterstat.dat", OUTPUTDIR);
+  output = fopenp (name, "w");
+  fclose (output);
+}
+
+/** Write an entry into file 'iterstat.dat'.
+ * One entry contains the last omega parameter for SOR,
+ * its upcoming variation domega, last number of iterations,
+ * and total number of iterations in the simulation. */
+void DumpIterStat (int TimeStep)	/* #THORIN */
+{
+  if (!CPU_Master) return;
+  FILE *output;
+  char name[256];
+  fflush (stdout);
+  sprintf (name, "%siterstat.dat", OUTPUTDIR);
+  output = fopenp (name, "a");
+  fprintf (output, "%d\t%#.18g\t%#.18g\t%d\t%d\n",\
+           TimeStep, glob_omega, glob_domega, glob_niterlast, glob_itercount);
+  fclose (output);
+  if (TimeStep > 0) {
+    masterprint ("Last relaxation parameter in SOR: %#.6g\n", glob_omega);
+    masterprint ("Last no. of iterations in SOR: %d\n", glob_niterlast);
+    masterprint ("Total no. of iterations in SOR: %d\n", glob_itercount);
+  }
+  fflush (stdout);
+}
+
+/** Read an entry from file 'iterstat.dat' corresponding
+ * to the restart output number. */
+void GetIterStat (int TimeStep)		/* #THORIN */
+{
+  FILE *input;
+  char name[256];
+  char testline[256];
+  int time, ivalue;
+  char *pt;
+  double value;
+  sprintf (name, "%siterstat.dat", OUTPUTDIR);
+  input = fopen (name, "r");
+  if (input == NULL) {
+    mastererr ("Can't read 'iterstat.dat' file. Aborting restart.\n");
+    prs_exit (1);
+  }
+  do {
+    pt = fgets (testline, 255, input);
+    sscanf (testline, "%d", &time);
+  } while ((time != TimeStep) && (pt != NULL));
+  if (pt == NULL) {
+    mastererr ("Can't read entry %d in 'iterstat.dat' file. Aborting restart.\n", TimeStep);
+    prs_exit (1);
+  }
+  fclose (input);
+  pt = testline;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%lf", &value);
+  glob_omega = (real)value;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%lf", &value);
+  glob_domega = (real)value;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%d", &ivalue);
+  glob_niterlast = (int)ivalue;
+  pt += strspn(pt, "eE0123456789-.");
+  pt += strspn(pt, "\t :=>_");
+  sscanf (pt, "%d", &ivalue);
+  glob_itercount = (int)ivalue;
+}

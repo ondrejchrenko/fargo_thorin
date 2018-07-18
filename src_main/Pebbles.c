@@ -18,10 +18,11 @@
 
 #include "fargo.h"
 
-#define TRAPEZMAX 35
-#define TRAPEZEPS 1.0e-7
+#define TRAPEZMAX 16
+#define TRAPEZEPS 1.0e-4
 
 extern boolean Restart, FastTransport;
+extern real MassTaper;
 
 static PolarGrid *PebbleDensTemp, *PebbleAccelrad, *PebbleAcceltheta;
 static PolarGrid *PebbleSize;
@@ -81,7 +82,7 @@ void InitPebblesViaFlux (Rho, Vrad)
 PolarGrid *Rho, *Vrad;
 {
   static real pebbleflux=0.0;
-  int i,j,l,nr,ns;
+  int i,j,l,nr,ns,err;
   real *rho, *vr, *etafc, *etacc, *psize, *tau, *pdens, *pvr, *pvt;
   real rho1, vr1, etafc1, etacc1;	// index 1 is for azimuthally averaged vars
   real pdens1, psize1, tau1, pvr1, pvt1;
@@ -151,15 +152,35 @@ PolarGrid *Rho, *Vrad;
     for (i=1; i<CPU_Number; i++) {
       sprintf (command, "cd %s; cat gaspebblestokes0.dat.%05d >> gaspebblestokes0.dat",\
                OUTPUTDIR, i);
-      system (command);
+      err = system (command);
+      if (err == -1) {
+        printf ("Error! Unable to cat output file gaspebblestokes0.dat.%05d\n", i);
+        printf ("Terminating now...\n");
+        prs_exit (1);
+      }
       sprintf (command, "cd %s; cat gaspebblesize0.dat.%05d >> gaspebblesize0.dat",\
                OUTPUTDIR, i);
-      system (command);
+      err = system (command);
+      if (err == -1) {
+        printf ("Error! Unable to cat output file gaspebblesize0.dat.%05d\n", i);
+        printf ("Terminating now...\n");
+        prs_exit (1);
+      }
     }
     sprintf (command, "cd %s; rm -f gaspebblestokes0.dat.0*", OUTPUTDIR);
-    system (command);
+    err = system (command);
+    if (err == -1) {
+      printf ("Error! Unable to rm output file gaspebblestokes0.dat.0*\n");
+      printf ("Terminating now...\n");
+      prs_exit (1);
+    }
     sprintf (command, "cd %s; rm -f gaspebblesize0.dat.0*", OUTPUTDIR);
-    system (command);
+    err = system (command);
+    if (err == -1) {
+      printf ("Error! Unable to rm output file gaspebblesize0.dat.0*\n");
+      printf ("Terminating now...\n");
+      prs_exit (1);
+    }
   }
 }
 
@@ -268,16 +289,17 @@ real a, b, H2;
 {
   static real integral;
   real iter, spacing, x, sum;
-  int j;
+  int j, it;
   if (n==1) {
     integral = 0.5*(b-a)*(exp(-0.5*a*a/H2) + exp(-0.5*b*b/H2));
     return integral;
   } else {
-    iter = pow(2.0,(real)(n-2));
+    for (it=1, j=1; j<n-1; j++) it <<= 1;
+    iter = it;
     spacing = (b-a)/iter;
     x = a + 0.5*spacing;
     sum = 0.0;
-    for (j=1; j<=(int)iter; j++) {
+    for (j=1; j<=it; j++) {
       sum += exp(-0.5*x*x/H2);
       x += spacing;
     }
@@ -349,6 +371,7 @@ real dt;
     Mplanet = sys->mass[k];
     PXplanet = VXplanet*Mplanet;
     PYplanet = VYplanet*Mplanet;
+    Mplanet *= MassTaper;						// MassTaper must be applied after the momenta are calculated !
     Rplanet = Xplanet*Xplanet + Yplanet*Yplanet;
     Rplanet3D = sqrt(Rplanet + Zplanet*Zplanet);
     Rplanet = sqrt(Rplanet);
@@ -504,6 +527,7 @@ real dt;
     // STEP 7 - Update the planet
     PXplanet += dPXplanet;
     PYplanet += dPYplanet;
+    Mplanet /= MassTaper;	// get the original mass back (so that we don't destroy values in 'sys')
     Mplanet  += dMplanet;
     sys->mass[k] = Mplanet;
     sys->vx[k] = PXplanet/Mplanet;
@@ -790,6 +814,7 @@ real dt;
   if (AccretHeating) heatsrc_max = sys->nb;
   for (k=0; k<sys->nb; k++) {
     Mplanet = sys->mass[k];
+    Mplanet *= MassTaper;
     Xplanet = sys->x[k];
     Yplanet = sys->y[k];
     dMplanet = Mplanet*dt/doubling;
@@ -815,7 +840,21 @@ real dt;
         heatsrc[k] = dE;
       }
     }
+    Mplanet /= MassTaper;
     Mplanet += dMplanet;
     sys->mass[k] = Mplanet;
+  }
+}
+
+/** Initialize fields related to the
+ * the accretion heating calculation */
+void InitAccretHeatSrc (npl)
+int npl;
+{
+  heatsrc = (real *)malloc (sizeof(real)*(npl));
+  heatsrc_index = (boolean *)malloc (sizeof(boolean)*(npl));
+  if ((heatsrc == NULL) || (heatsrc_index == NULL)) {
+    fprintf (stderr, "Not enough memory when allocating 'heatsrc' and 'heatsrc_index'.\n");
+    prs_exit (1);
   }
 }

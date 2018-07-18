@@ -25,6 +25,7 @@ static PolarGrid *VradNew,   *VradInt;
 static PolarGrid *VthetaNew, *VthetaInt;
 static real timeCRASH;  
 extern boolean Corotating;
+extern boolean Restart;		/* #THORIN */
 
 static PolarGrid *EnergyNew, *EnergyInt;	/* #THORIN */
 
@@ -126,6 +127,9 @@ PolarGrid *Rho, *Vr, *Vt, *En;
   FillPolar1DArrays (); /* #THORIN: construct the arrays related to the grid (Rinf, Rsup, ...) here */
   FillSigma ();		/* calculate SigmaMed[] and SigmaInf[] based on the surf.density profile */
   FillEnergy ();	/* #THORIN: calculate EnergyMed; see Theo.c */
+  if (EnergyEq && (IterInitTemper || DiskAccretion)) {
+    if (!InitFromFile && !Restart) IterateInitialProfiles ();		/* #THORIN: improve the initial temperature profile by simple iterations */
+  }
   InitGasDensityEnergy (Rho, En);	/* #THORIN: we initialize the density and energy
 					   here because they are needed to compute
 					   the sound speed, pressure and temperature;
@@ -219,7 +223,7 @@ struct reb_simulation *rsim;
   MPI_Allreduce (&gastimestepcfl, &GasTimeStepsCFL, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
   dt = DT / (real)GasTimeStepsCFL;
   while (dtemp < 0.999999999*DT) {
-    MassTaper = PhysicalTime/(MASSTAPER*2.0*M_PI);
+    MassTaper = PhysicalTime/(MASSTAPER*2.0*M_PI) + 1.e-16;	/* #THORIN: small value added to avoid divisions by zero */
     MassTaper = (MassTaper > 1.0 ? 1.0 : pow(sin(MassTaper*M_PI/2.0),2.0));
     if (IsDisk == YES) {
       CommunicateBoundaries (Rho,Vrad,Vtheta,Energy,Label); /* #THORIN */
@@ -396,7 +400,9 @@ real dt;
    * rotation at the boundaries but only if the Damping condition is not used */
   UpdateDivVelocAndStressTensor (VradInt, VthetaInt, Rho);
   UpdateVelocityWithViscousTerms (VradInt, VthetaInt, Rho, dt);
-  if (!Damping) ImposeKeplerianEdges (VthetaInt);
+  /* #THORIN: the following condition leads to poor conservation of ang. momentum;
+   * not used anymore
+   * if (!Damping) ImposeKeplerianEdges (VthetaInt); */
 }
 
 void SubStep2 (Rho, Energy, dt)	/* #THORIN */
@@ -628,15 +634,15 @@ real deltaT;
       else dvt = -dvt;
       invdt4 = max2(dvr/dxrad,dvt/dxtheta);
       invdt4*= 4.0*CVNR*CVNR;
-      /*if ( ViscosityAlpha || (VISCOSITY != 0.0) )
+      if ( ViscosityAlpha || (VISCOSITY != 0.0) )
 	invdt5 = FViscosity(Rmed[i])*4./pow(min2(dxrad,dxtheta),2);
-      dt = CFLSECURITY/sqrt(invdt1*invdt1+invdt2*invdt2+invdt3*invdt3+\
+      /*dt = CFLSECURITY/sqrt(invdt1*invdt1+invdt2*invdt2+invdt3*invdt3+\
 			    invdt4*invdt4+invdt5*invdt5); */
       if (!Pebbles) {
 	dt = CFLSECURITY/sqrt(invdt1*invdt1+invdt2*invdt2+invdt3*invdt3+\
-                            invdt4*invdt4+invdtreb_sq);
+                            invdt4*invdt4+invdt5*invdt5+invdtreb_sq);
       } else {
-        dt = CFLSECURITY/sqrt(invdt1*invdt1+invdt2*invdt2+invdt3*invdt3+invdt4*invdt4+invdtpeb_sq+invdtreb_sq);
+        dt = CFLSECURITY/sqrt(invdt1*invdt1+invdt2*invdt2+invdt3*invdt3+invdt4*invdt4+invdt5*invdt5+invdtpeb_sq+invdtreb_sq);
       }
       if (dt < newdt) {
 	newdt = dt;
@@ -701,7 +707,8 @@ PolarGrid *Rho, *Energy;
       }
     }
   }
-  mpi_make1Dprofile (cs, globcsvec); /* this will update the radial field which holds the azimuth-averaged values of sound speed */
+  /* this will update the radial field which holds the azimuth-averaged values of sound speed, if needed */
+  if (ViscosityAlpha) mpi_make1Dprofile (cs, globcsvec);
 }
 
 /** Updates the pressure over the mesh. */
@@ -756,4 +763,6 @@ PolarGrid *Rho, *Energy;
       }
     }
   }
+  /* this will update the radial field which holds the azimuth-averaged values of temperature, if needed */
+  if (ViscosityAlpha && AlphaFlock) mpi_make1Dprofile (temperature, globtvec);
 }

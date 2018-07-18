@@ -20,6 +20,7 @@
 #include "fargo.h"
 
 extern boolean OpenInner, NonReflecting;
+extern real MassTaper;
 
 /** Calculates and writes the disk torques (both specific and normalized) 
  * acting on the planets. Uses the accelerations provided by the vertical
@@ -45,7 +46,7 @@ PlanetarySystem *psys;
     y = psys->y[i];
     ax = psys->ax[i];
     ay = psys->ay[i];
-    m = psys->mass[i];
+    m = (MassTaper+1.e-30)*psys->mass[i];	/* #THORIN: tapering included; must avoid division by zero */
     if (CPU_Rank == CPU_Number-1) {
       r2 = x*x+y*y;
       r = sqrt(r2);
@@ -61,6 +62,7 @@ PlanetarySystem *psys;
       norm *= rhopl;
       tq = x*ay - y*ax;
       tq_norm = tq*m*ADIABIND/norm;
+      if (MassTaper == 0.0) tq_norm = 0.0;
       sprintf (filename, "%stqwk%d.dat", OUTPUTDIR, i);
       out = fopenp (filename, "a");
       fprintf (out, "%#.18g\t%#.18g\t%#.18g\t%#.18g\t%#.18g\t%#.18g\t%#.18g\n", PhysicalTime,tq,tq_norm,x,y,ax,ay);

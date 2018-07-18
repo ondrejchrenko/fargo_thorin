@@ -39,18 +39,13 @@ char *argv[];
   MPI_Comm_rank (MPI_COMM_WORLD, &CPU_Rank);
   MPI_Comm_size (MPI_COMM_WORLD, &CPU_Number);
   CPU_Master = (CPU_Rank == 0 ? 1 : 0);
-#ifdef OPENMP   			/* #THORIN: control of the OpenMP threading */
-  omp_set_dynamic (0);  		/* disable automatic adjustment of the number of threads */
-  int numproc = omp_get_num_procs ();	/* find available number of cores */
-  omp_set_num_threads (numproc);	/* set it */
-#endif /* OPENMP */			/* <--- */
   setfpe ();			/* Control behavior for floating point
 				   exceptions trapping (default is not to do anything) */
   if (argc == 1) PrintUsage (argv[0]);
   strcpy (ParameterFile, "");
   for (i = 1; i < argc; i++) {
     if (*(argv[i]) == '-') {
-      if (strspn (argv[i], "-secndovtpfamzib0123456789") != strlen (argv[i]))
+      if (strspn (argv[i], "-secndovtpfamzibM0123456789") != strlen (argv[i]))	/* #THORIN */
 	PrintUsage (argv[0]);
       if (strchr (argv[i], 'n'))
 	disable = YES;
@@ -68,6 +63,9 @@ char *argv[];
 	CentrifugalBalance = YES;
       if (strchr (argv[i], 'm'))
 	Merge = YES;
+      if (strchr (argv[i], 'M'))		/* #THORIN */
+	MergeDirect = YES;
+      if (strchr (argv[i], 'a'))
       if (strchr (argv[i], 'a'))
 	MonitorIntegral = YES;
       if (strchr (argv[i], 'z'))
@@ -112,17 +110,15 @@ char *argv[];
     mastererr ("You cannot use tabulated surface density\n");
     mastererr ("or surface internal energy in a non-restart run.\n");
     mastererr ("Aborted\n");
-    prs_exit (0);
+    prs_exit (1);
+  }
+  if (Merge && MergeDirect) {
+    mastererr ("ERROR - You cannot use -m and -M switches at the same time.\n");
+    mastererr ("Restart with only one of them to merge the output files\n");
+    mastererr ("from individual CPUs. Terminating now...\n");
+    prs_exit (1);
   }
   if (ParameterFile[0] == 0) PrintUsage (argv[0]);
-#ifdef OPENMP   	/* #THORIN: print info in the case of a multithreaded run */
-  if (CPU_Number == 1) {	/* 2DO this wont work with MPI, would have to send info about num of threads from each node to the master */
-    masterprint ("\n\n----------\n");
-    masterprint ("\033[1mMultithreading enabled!\033[0m\n");
-    masterprint ("Number of threads available to parallel constructs: %d\n", omp_get_max_threads());
-    masterprint ("----------\n\n");
-  }
-#endif /* OPENMP <--- */
   ReadVariables (ParameterFile);	/* #THORIN: InitPlanetarySystem() and ListPlanets() used to be here, replaced by functions of the Rebound interface */
   SplitDomain ();
   if (verbose == YES) 
@@ -156,8 +152,14 @@ char *argv[];
   OmegaFrame = OMEGAFRAME;
   if (Corotating == YES) OmegaFrame = GetPsysInfo (sys, FREQUENCY);
   Initialization (gas_density, gas_v_rad, gas_v_theta, gas_energy, gas_label); /* #THORIN */
+  if (AccretHeating) InitAccretHeatSrc (sys->nb);	/* #THORIN */
   InitComputeAccel ();
-  if (Restart) OmegaFrame = GetOmegaFrame (NbRestart);	/* #THORIN */
+  if (Restart) {					/* #THORIN */
+    OmegaFrame = GetOmegaFrame (NbRestart);
+    GetIterStat (NbRestart);
+  } else {
+    EmptyIterStat ();
+  }
   PhysicalTimeInitial = PhysicalTime;
   MultiplyPolarGridbyConstant (gas_density, ScalingFactor);
   for (i = begin_i; i <= NTOT; i++) {
@@ -173,6 +175,7 @@ char *argv[];
       if (WriteTorqueMapFile) CreateTorqueMapInfile (TimeStep, gas_density);	/* #THORIN */
       if (TorqueDensity) DumpTorqueDensNow=YES;					/* #THORIN */
       DumpOmegaFrame (TimeStep);			/* #THORIN: print OmegaFrame - it is needed for restart runs */
+      DumpIterStat (TimeStep);				/* #THORIN: output info about the SOR setup - it is needed for restart runs */
       if ((OnlyInit) || ((GotoNextOutput) && (!StillWriteOneOutput))) {
 	MPI_Finalize();
 	return 0;

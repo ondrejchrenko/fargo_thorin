@@ -130,6 +130,7 @@ void UpdateDivVelocAndStressTensor ();
 void UpdateVelocityWithViscousTerms ();
 void ImposeKeplerianEdges ();
 void ReadfromAsciiFile ();
+void IterateInitialProfiles ();
 /* #THORIN: radiative diffusion */
 void InitRadiatDiffusionFields ();
 void CalculateQminus ();
@@ -149,6 +150,13 @@ void ChessBoardIndexing ();
 void SetWaveKillingZones ();
 void DampingBoundary ();
 void ActualizeQbalance ();
+void GetIterStat ();
+void EmptyIterStat ();
+void DumpIterStat ();
+real opacity_const ();
+real opacity_BL94 ();
+real opacity_ZHU12 ();
+real opacity_LP85 ();
 /* #THORIN: FARGO-REBOUND interface */
 struct reb_simulation *SetupReboundSimulation ();
 void SetupIntegratorParams ();
@@ -193,5 +201,10 @@ void CriticalCharTime ();
 void ParticleDiffusion ();
 void BckpFieldsForBC ();
 void ParametricAccretion ();
+void InitAccretHeatSrc ();
 /* #THORIN: tools */
 void CreateTorqueMapInfile ();
+void WriteDiskPolarDirect ();
+/* */
+void MdotBoundary ();
+real NuFromAlpha ();

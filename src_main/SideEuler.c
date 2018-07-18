@@ -132,6 +132,168 @@ PolarGrid *Vrad, *Rho, *Energy;
   }
 }
 
+// 2DO apply BC at the end of SubStep1 before recalc. of viscous terms?
+// (the results are different, decide whether to do this)
+void MdotBoundary (Vrad, Vtheta, Rho, Energy)
+PolarGrid *Vrad, *Vtheta, *Rho, *Energy;
+{
+  int i,j,lg,la1,la2,nr,ns;
+  real *vr, *vt, *rho, *energy;
+  real rho_a1, rho_a2, energy_a1, energy_a2, nu_g;
+  real cs_a1, cs_g=0.0, cs_outer, cs_ag, Mdot, vr_inner, cs_inner; 
+  real t_a1, t_a2, tslope, t_g;
+  real RhoMdot, EMdot, vr_ag, vr_outer;
+  /* ----- */
+  ns = Vrad->Nsec;
+  nr = Vrad->Nrad;
+  vr = Vrad->Field;
+  vt = Vtheta->Field;
+  rho = Rho->Field;
+  energy = Energy->Field;
+  if (CPU_Master) {
+    i = 0;
+    rho_a1 = 0.0;
+    rho_a2 = 0.0;
+    energy_a1 = 0.0;
+    energy_a2 = 0.0;
+#pragma omp parallel for default(none) \
+    shared(ns,i,rho,energy) \
+    private(la1,la2) reduction(+:rho_a1,rho_a2,energy_a1,energy_a2)
+    for (j=0; j<ns; j++) {
+      la1 = j + ns;
+      la2 = la1 + ns;
+      rho_a1 += rho[la1];
+      rho_a2 += rho[la2];
+      energy_a1 += energy[la1];
+      energy_a2 += energy[la2];
+    }
+    rho_a1 /= (real)ns;
+    rho_a2 /= (real)ns;
+    energy_a1 /= (real)ns;
+    energy_a2 /= (real)ns;
+    t_a1 = energy_a1*MOLWEIGHT*(ADIABIND - 1.0)/(rho_a1*GASCONST);	// translate sigma and energy to temperature
+    t_a2 = energy_a2*MOLWEIGHT*(ADIABIND - 1.0)/(rho_a2*GASCONST);
+    tslope = (t_a1-t_a2)/(Rmed[i+1]-Rmed[i+2])/(0.5*(t_a1+t_a2))*Rsup[i+1];	// find a power-law slope of temperature
+    t_g = t_a1*pow(Rmed[i]/Rmed[i+1],tslope);					// extrapolate temperature to the ghost ring
+    if (!ViscosityAlpha) {
+      nu_g = VISCOSITY;
+    } else {
+      cs_g = sqrt(ADIABIND*GASCONST/MOLWEIGHT*t_g);	// get the sound speed and viscosity in the outer ring
+      nu_g = NuFromAlpha (OmegaInv[i], t_g, cs_g);
+    }      
+    /*Mdot = DISKACCRETION/(2.0*PI);			// disk accretion rate from M_sun/yr to M_sun/(code time)
+    RhoMdot = Mdot/(3.0*PI*nu_g);*/			// this density will refill the ghost ring
+    Mdot = FViscosity(Rmed[i+1])*rho_a1;		// these 2 lines could also be used in some cases...yes, here at inner boundary
+    RhoMdot = Mdot/nu_g;
+    EMdot = RhoMdot*t_g*GASCONST/(MOLWEIGHT*(ADIABIND - 1.0));
+    if (!ViscosityAlpha) {
+      vr_ag = -1.5*VISCOSITY*InvRinf[i+1];
+      vr_inner = -1.5*VISCOSITY*InvRinf[i];
+    } else {
+      cs_a1 = sqrt(ADIABIND*(ADIABIND-1.0)*energy_a1/rho_a1);
+      cs_ag = 0.5*(cs_a1 + cs_g);
+      cs_inner = cs_g*sqrt(Rmed[i]/Rinf[i]);		// assume the aspect ratio to be constant between Rmed[i] and Rsup[i]
+      vr_ag = -1.5*NuFromAlpha(pow(Rinf[i+1],1.5), 0.5*(t_a1 + t_g), cs_ag)*InvRinf[i+1];
+      vr_inner = -1.5*NuFromAlpha(pow(Rinf[i],1.5), t_g, cs_inner)*InvRinf[i];	// (note: InvRinf undefined for the outermost interface...)
+    }
+#pragma omp parallel for default(none) \
+    shared(ns,i,vr,vt,rho,energy,vr_ag,vr_inner,OmegaFrame,Rmed,InvRmed,RhoMdot,EMdot) \
+    private(j,lg,la1)
+    for (j=0; j<ns; j++) {
+      lg = j + i*ns;
+      la1 = lg + ns;
+      vr[la1] = vr_ag;
+      vr[lg] = vr_inner;
+      vt[lg] = (vt[la1] + OmegaFrame*Rmed[i+1])*sqrt(Rmed[i+1]*InvRmed[i]) - OmegaFrame*Rmed[i];
+      //vt[lg] = sqrt(InvRmed[i]*(1.0-cs_g*cs_g*Rmed[i]/ADIABIND)) - OmegaFrame*Rmed[i];
+      rho[lg] = RhoMdot;
+      energy[lg] = EMdot;
+    }
+  }
+/*  if (CPU_Master) {
+    i = 0;			// inner boundary
+#pragma omp parallel for default(none) \
+    shared(ns,i,vr,rho,energy,vt,OmegaFrame,Rmed,InvRmed) \
+    private(j,lg,la1,la2)
+    for (j=0; j<ns; j++) {
+      lg = j;			// HD index in the ghost ring (0-th ring)
+      la1 = lg + ns;		// HD index in the 1st active ring
+      la2 = la1 + ns;		// HD index in the 2nd active ring
+      if (vr[la2] > 0.0) {	// no inflow (inwards the domain), only outflow (from the domain)
+        vr[la1] = 0.0;		// veloc. at g---a1 boundary
+	vr[lg] = 0.0;		// veloc. at void---g boundary
+      } else {
+        vr[la1] = vr[la2];
+        vr[lg] = vr[la2];
+      }
+      rho[lg] = rho[la1];
+      energy[lg] = energy[la1];
+      vt[lg] = sqrt(InvRmed[i]) - OmegaFrame*Rmed[i];
+    }
+  }*/
+  if (CPU_Rank == CPU_Number-1) {
+    i = nr-1;			// outer boundary with prescribed inflow and temperature profile extrapolation
+    rho_a1 = 0.0;		// get average density and energy in 2 neighbouring active rings
+    rho_a2 = 0.0;
+    energy_a1 = 0.0;
+    energy_a2 = 0.0;
+#pragma omp parallel for default(none) \
+    shared(ns,i,rho,energy) \
+    private(la1,la2) reduction(+:rho_a1,rho_a2,energy_a1,energy_a2)
+    for (j=0; j<ns; j++) {
+      la1 = j + (i-1)*ns;
+      la2 = la1 - ns;
+      rho_a1 += rho[la1];
+      rho_a2 += rho[la2];
+      energy_a1 += energy[la1];
+      energy_a2 += energy[la2];
+    }
+    rho_a1 /= (real)ns;
+    rho_a2 /= (real)ns;
+    energy_a1 /= (real)ns;
+    energy_a2 /= (real)ns;
+    t_a1 = energy_a1*MOLWEIGHT*(ADIABIND - 1.0)/(rho_a1*GASCONST);	// translate sigma and energy to temperature
+    t_a2 = energy_a2*MOLWEIGHT*(ADIABIND - 1.0)/(rho_a2*GASCONST);
+    tslope = (t_a2-t_a1)/(Rmed[i-2]-Rmed[i-1])/(0.5*(t_a1+t_a2))*Rsup[i-2];	// find a power-law slope of temperature
+    t_g = t_a1*pow(Rmed[i]/Rmed[i-1],tslope);					// extrapolate temperature to the ghost ring
+    if (!ViscosityAlpha) {
+      nu_g = VISCOSITY;
+    } else {
+      cs_g = sqrt(ADIABIND*GASCONST/MOLWEIGHT*t_g);	// get the sound speed and viscosity in the outer ring
+      nu_g = NuFromAlpha (OmegaInv[i], t_g, cs_g);
+    }      
+    Mdot = DISKACCRETION/(2.0*PI);			// disk accretion rate from M_sun/yr to M_sun/(code time)
+    RhoMdot = Mdot/(3.0*PI*nu_g);			// this density will refill the ghost ring
+    /*Mdot = FViscosity(Rmed[nr-2])*rho_a1;		// these 2 lines could also be used in some cases...
+    RhoMdot = Mdot/nu_g;*/
+    EMdot = RhoMdot*t_g*GASCONST/(MOLWEIGHT*(ADIABIND - 1.0));
+    if (!ViscosityAlpha) {
+      vr_ag = -1.5*VISCOSITY*InvRinf[i];
+      vr_outer = -1.5*VISCOSITY/Rsup[i];	// (note: InvRinf undefined for the outermost interface...)
+    } else {
+      cs_a1 = sqrt(ADIABIND*(ADIABIND-1.0)*energy_a1/rho_a1);
+      cs_ag = 0.5*(cs_a1 + cs_g);
+      cs_outer = cs_g*sqrt(Rmed[i]/Rsup[i]);		// assume the aspect ratio to be constant between Rmed[i] and Rsup[i]
+      vr_ag = -1.5*NuFromAlpha(pow(Rinf[i],1.5), 0.5*(t_a1 + t_g), cs_ag)*InvRinf[i];
+      vr_outer = -1.5*NuFromAlpha(pow(Rsup[i],1.5), t_g, cs_outer)/Rsup[i];	// (note: InvRinf undefined for the outermost interface...)
+    }
+#pragma omp parallel for default(none) \
+    shared(ns,i,vr,vt,rho,energy,vr_ag,vr_outer,OmegaFrame,Rmed,InvRmed,RhoMdot,EMdot) \
+    private(j,lg,la1)
+    for (j=0; j<ns; j++) {
+      lg = j + i*ns;
+      la1 = lg - ns;
+      vr[lg] = vr_ag;
+      vr[lg+ns] = vr_outer;
+      vt[lg] = (vt[la1] + OmegaFrame*Rmed[i-1])*sqrt(Rmed[i-1]*InvRmed[i]) - OmegaFrame*Rmed[i];
+      //vt[lg] = sqrt(InvRmed[i]*(1.0-cs_g*cs_g*Rmed[i]/ADIABIND)) - OmegaFrame*Rmed[i];
+      rho[lg] = RhoMdot;
+      energy[lg] = EMdot;
+    }
+  }
+
+}
+
 void NonReflectingBoundary (Vrad, Rho, Energy)	/* #THORIN */
 PolarGrid *Vrad, *Rho, *Energy;
 {
@@ -258,7 +420,6 @@ void SetWaveKillingZones ()	/* #THORIN */
     if (Rmed[i] > DRout) {
       damp = (Rmed[i] - DRout)/(RMAX - DRout);
       WaveKiller[i] = damp*damp/tauout;
-      WaveKiller[i] = damp/tauout;
     }
   }
 }
@@ -273,7 +434,7 @@ real step;
 {
   int i, j, l, ns;
   real *vrad, *vtheta, *rho, *energy;
-  real vrad0, vtheta0=0.0, rho0, energy0;
+  real vrad0, vtheta0=0.0, rho0, energy0, vt_avr;
   real DRin, DRout, lambda;
   /* ----- */
   vrad = Vrad->Field;
@@ -285,13 +446,26 @@ real step;
   DRout = RMAX*DAMPINGRMAXFRAC;
 #pragma omp parallel default(none) \
   shared(Zero_or_active,Max_or_active,Rmed,DRin,DRout,DampInit,\
-         ns,vrad,rho,energy,vtheta,WaveKiller,OmegaFrame,SigmaMed,EnergyMed,VthetaMed,step) \
-  private(i,vrad0,rho0,energy0,vtheta0,lambda,j,l)
+         ns,vrad,rho,energy,vtheta,WaveKiller,OmegaFrame,SigmaMed,EnergyMed,VthetaMed,step,\
+	 DampAlphaVeloc,InvRmed,Rinf,InvRinf) \
+  firstprivate(vtheta0) \
+  private(i,vrad0,rho0,energy0,lambda,j,l,vt_avr)
   {
 #pragma omp for
   for (i=Zero_or_active; i<Max_or_active; i++) {
     if (Rmed[i] < DRin || Rmed[i] > DRout) {
-      vrad0 = 0.0;
+      if (DampAlphaVeloc) {
+	vt_avr = 0.0;
+        for (j=0; j<ns; j++) {
+	  l = j + i*ns;	
+          vt_avr += vtheta[l];
+	}
+	vt_avr /= (real)ns;
+        vrad0 = -1.5*FViscosity(Rinf[i])*InvRinf[i];
+	vtheta0 = vt_avr;
+      } else {
+        vrad0 = 0.0;
+      }
       if (DampInit) {
         rho0 = SigmaMed[i];
 	energy0 = EnergyMed[i];
@@ -301,11 +475,11 @@ real step;
       for (j=0; j<ns; j++) {
         l = j + i*ns;
         vrad[l] = (vrad[l] + lambda*vrad0)/(1.0 + lambda);
+	if (DampInit || DampAlphaVeloc) vtheta[l] = (vtheta[l] + lambda*vtheta0)/(1.0 + lambda);
 	if (DampInit) {
   	  rho[l] = (rho[l] + lambda*rho0)/(1.0 + lambda);
           energy[l] = (energy[l] + lambda*energy0)/(1.0 + lambda);
-	  vtheta[l] = (vtheta[l] + lambda*vtheta0)/(1.0 + lambda);
-	}
+        }
       }
     }
   }
@@ -392,6 +566,7 @@ real dt;
     NonReflectingBoundary (Vrad, Rho, Energy);		/* #THORIN */	
   }
   if (Damping) DampingBoundary (Vrad, Vtheta, Rho, Energy, dt);	/* #THORIN */
+  if (DiskAccretion == YES) MdotBoundary (Vrad, Vtheta, Rho, Energy);	/* #THORIN */
   if (OuterSourceMass == YES) ApplyOuterSourceMass (Rho, Vrad);
 }
 

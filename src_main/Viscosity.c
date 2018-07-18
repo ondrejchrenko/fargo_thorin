@@ -23,19 +23,22 @@ original code by Frédéric Masset
 static PolarGrid *DRR, *DRP, *DPP;
 /* #THORIN: DivergenceVelocity, TAURR, TAUPP, TAURP are now declared in global.h */
 
-real FViscosity (rad)
+real FViscosity (rad)		/* #THORIN: new type of alpha viscosity; cavities disabled */
      real rad;
 {
-  real viscosity, rmin, rmax, scale;
+  real viscosity, omegainv;
+  //real rmin, rmax, scale, alpha;
   int i=0;
   /* ----- */
-  viscosity = VISCOSITY;
-  if (ViscosityAlpha) {
+  if (!ViscosityAlpha) {
+    viscosity = VISCOSITY;
+  } else {				/* #THORIN: alpha viscosity according to Flock et al. (2016) added */
+    omegainv = pow(rad,1.5);
     while (GlobalRmed[i] < rad) i++;	/* ! this spans the GLOBAL grid (among all MPI processes) */
-		/* #THORIN: globcsvec[] used here */
-    viscosity = ALPHAVISCOSITY*globcsvec[i]*globcsvec[i]*pow(rad, 1.5);
+    viscosity = NuFromAlpha (omegainv, globtvec[i], globcsvec[i]);
   }
-  rmin = CAVITYRADIUS-CAVITYWIDTH*ASPECTRATIO;
+  /* #THORIN: cavity creation temporarily disabled in this version */
+  /*rmin = CAVITYRADIUS-CAVITYWIDTH*ASPECTRATIO;
   rmax = CAVITYRADIUS+CAVITYWIDTH*ASPECTRATIO;
   scale = 1.0+(PhysicalTime-PhysicalTimeInitial)*LAMBDADOUBLING;
   rmin *= scale;
@@ -43,10 +46,34 @@ real FViscosity (rad)
   if (rad < rmin) viscosity *= CAVITYRATIO;
   if ((rad >= rmin) && (rad <= rmax)) {
     viscosity *= exp((rmax-rad)/(rmax-rmin)*log(CAVITYRATIO));
-  }
+  }*/
   return viscosity;
 }
-  
+ 
+/** Function which calculates the kinematic from alpha viscosity. */
+real NuFromAlpha (omegainv, temper, cs)
+real omegainv, temper, cs;
+{
+  real viscosity, alpha;
+  static boolean first=YES;
+  static real dalpha, tmri, deltat;
+  if (first) {
+    first = NO;
+    if (AlphaFlock) {
+      dalpha = ALPHAMRI - ALPHADEAD;
+      tmri = TMRI/T2SI;
+      deltat = TWIDTH/T2SI;
+    }
+  }
+  if (!AlphaFlock) {
+    alpha = ALPHAVISCOSITY;
+  } else {
+    alpha = 0.5*dalpha*(1.0 - tanh((tmri - temper)/deltat)) + ALPHADEAD;
+  }
+  viscosity = alpha*cs*cs*omegainv;
+  return viscosity;
+}
+
 real AspectRatio (rad)
      real rad;
 {
