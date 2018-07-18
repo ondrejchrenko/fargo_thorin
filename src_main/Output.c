@@ -381,9 +381,11 @@ void DumpIterStat (int TimeStep)	/* #THORIN */
   fprintf (output, "%d\t%#.18g\t%#.18g\t%d\t%d\n",\
            TimeStep, glob_omega, glob_domega, glob_niterlast, glob_itercount);
   fclose (output);
-  masterprint ("Last relaxation parameter in SOR: %#.6g\n", glob_omega);
-  masterprint ("Last no. of iterations in SOR: %d\n", glob_niterlast);
-  masterprint ("Total no. of iterations in SOR: %d\n", glob_itercount);
+  if (TimeStep > 0) {
+    masterprint ("Last relaxation parameter in SOR: %#.6g\n", glob_omega);
+    masterprint ("Last no. of iterations in SOR: %d\n", glob_niterlast);
+    masterprint ("Total no. of iterations in SOR: %d\n", glob_itercount);
+  }
   fflush (stdout);
 }
 

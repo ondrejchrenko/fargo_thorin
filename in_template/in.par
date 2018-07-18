@@ -1,0 +1,111 @@
+### Disk parameters
+### ---------------
+AspectRatio             0.05            
+SigmaSlope              0.5             
+Sigma0                  8.4375e-5       [code units] (e.g. 8.4375e-5 equals 750 g/cm^2 at 1 AU)
+FlaringIndex		0.0
+## When disk accretion rate below is used,
+## it overrides any Sigma0, SigmaSlope, AspectRatio and FlaringIndex
+## (initial conditions are set by an iterative procedure)
+## and it will automatically apply a \dot{M} boundary condition
+#DiskAccretion		4.e-8		[M_sun/yr]
+
+### Viscosity setup (use only one viscosity type!)
+### ----------------------------------------------
+## Uniform kinematic viscosity
+Viscosity		1.2214e-5	[code units] (e.g. 1.2214e-5 equals 5.0e14 cm^2/s)
+## Uniform alpha viscosity (=variable kinematic viscosity)
+#AlphaViscosity		 0.0054
+## Alpha viscosity with a dead-zone/MRI-zone transition (Flock et al. 2016)
+#AlphaFlock              YES
+#TMRI                    1000.0		[Kelvin]
+#TWIDTH                  25.0		[Kelvin]
+#ALPHAMRI                1.9e-2
+#ALPHADEAD               1.e-3
+
+### Energy equation setup
+
+EnergyEquation          YES
+IterInitTemper		YES
+Adiabind                1.4
+StellarIrradiation      YES
+OpacityDrop		0.6
+EffectiveTemperature    4370.0          [Kelvin]
+StellarRadius           1.5             [R_sun]
+DiscAlbedo              0.5
+OpacityLaw		BELL		BELL or LIN or ZHU (for Bell & Lin 94, Lin & Papa 85, Zhu et al 12)
+
+### HD field initialization from files
+### (useful to start with an equilibrium disc)
+
+InitializeFromFile      NO
+DensInfile              in_template/gasdens.cfg
+VradInfile              in_template/gasvrad.cfg
+VthetaInfile            in_template/gasvtheta.cfg
+TemperInfile            in_template/gastemper.cfg
+
+### Planet parameters
+
+PlanetConfig            in_template/zeromass.planet.cfg
+ThicknessSmoothing      0.6             Softening parameters in disk thickness
+ExcludeHill             NO              WARNING - the choice of YES or NO should depend on the planetary masses
+
+### Numerical method parameters
+
+Transport               FARGO
+NonReflecting		NO
+OpenInner		NO
+Damping			YES
+DampTowards             ZERO		INIT or ZEROVRAD or ALPHAVELOC
+DampingRminFrac		1.2
+DampingRmaxFrac		0.9
+DampingPeriodFrac	0.1
+Disk                    YES
+OmegaFrame              0.0
+Frame                   Fixed
+IndirectTerm            YES
+
+### Mesh parameters
+
+Nrad                    256             Radial number of zones
+Nsec                    4               Azimuthal number of zones (sectors)
+Rmin                    2.8             Inner boundary radius
+Rmax                    14.0            Outer boundary radius
+RadialSpacing           Arithmetic      Zone interfaces evenly spaced
+
+### Output control parameters
+
+Ntot                    6000
+Ninterm                 100
+DT                      3.725
+OutputDir               out_template
+
+###
+NoutElements            20
+MassTaper		10.
+WriteTorqueFiles        NO
+PlanetaryDensity        3.0
+ResolveCollisions       NO
+TargetNPL               -1
+PlanetsFeelDisk         NO
+AccretionRate           0.0
+HillCut                 0.8             Parameter of the tapering function from Crida et al. (2008)
+VerticalDamping         0.3             Factorization of the Tanaka & Ward (2004) formula (see also Morby et al. 2007), has to be TUNED!
+IAS15Precission		1.e-9
+IAS15MinDT		0.0
+
+###
+PebbleAccretion         NO
+BackReaction            NO
+AccretionalHeating      NO
+ParticleDiffusion	NO
+WriteEta                NO
+PebbleFlux		0.0002
+PebbleAlpha             0.0001          ! should be the same as the gas alpha (when used)
+SchmidtNumber		1.0
+PebbleCoagulation       0.5
+PebbleBulkDens		1.0
+
+###
+TorqueMapInfile		NO
+GetTorqueForPlanet	-1

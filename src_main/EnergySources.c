@@ -788,7 +788,7 @@ PolarGrid *Surfdens;
   real *cs, *temper, *pressure, *surfdens;
   real CS[MAX1D], T[MAX1D], P[MAX1D], Sigma[MAX1D];	// need to create global azimuthally averaged fields
   real Rho, tmpr, Opacity, Viscalpha, H;
-  real Omega, kappa1, kappa2, kappa3, tmp1, tmp2;
+  real Omega;
   int i;
   char name[256];
   FILE *output;
